@@ -1,0 +1,32 @@
+/* CSS Variables - Diseño Plano basado en ui-preview.html */
+:root {
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F3F4F6;
+    --bg-inverted: #1A1A1A;
+    --text-main: #111827;
+    --text-muted: #4B5563;
+    --accent-green: #047857;
+    --accent-purple: #6200EA;
+    --border-color: #E5E7EB;
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background-color: var(--bg-primary); /* Fondo blanco por defecto */
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    color: var(--text-main);
+}
+
+/* Tipografía global */
+h1, h2, h3, h4, h5, h6, p {
+    margin: 0;
+}
+
+h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 8px;
+}
