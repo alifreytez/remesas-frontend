@@ -7,13 +7,15 @@
         options = [],
         value = $bindable(''),
         disabled = false,
-        placeholder = 'Selecciona una opción'
+        placeholder = 'Selecciona una opción',
+        required = false
     }: {
         label?: string;
         options: { value: string; label: string }[];
         value?: string;
         disabled?: boolean;
         placeholder?: string;
+        required?: boolean;
     } = $props();
 
     let open = $state(false);
@@ -76,7 +78,12 @@
 
 <div class="select-container" bind:this={dropdownRef}>
     {#if label}
-        <label>{label}</label>
+        <label>
+            {label}
+            {#if required}
+                <span class="asterisk">*</span>
+            {/if}
+        </label>
     {/if}
     
     <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -141,6 +148,11 @@
         font-size: 14px;
         font-weight: 500;
         color: var(--text-main);
+    }
+
+    .asterisk {
+        color: var(--danger-600);
+        margin-left: 2px;
     }
 
     .select-trigger {

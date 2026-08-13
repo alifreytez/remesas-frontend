@@ -6,21 +6,26 @@
         type = 'button',
         onclick,
         disabled = false,
+        fullWidth = false,
         children,
-        class: className = ''
+        class: className = '',
+        style = ''
     }: {
         variant?: 'primary' | 'outline' | 'icon';
         type?: 'button' | 'submit' | 'reset';
         onclick?: (event: MouseEvent) => void;
         disabled?: boolean;
+        fullWidth?: boolean;
         children?: Snippet;
         class?: string;
+        style?: string;
     } = $props();
 </script>
 
 <button
     {type}
-    class="btn-pill {variant === 'outline' ? 'btn-pill-outline' : ''} {variant === 'icon' ? 'btn-icon' : ''} {className}"
+    class="btn-pill {variant === 'outline' ? 'btn-pill-outline' : ''} {variant === 'icon' ? 'btn-icon' : ''} {fullWidth ? 'btn-full-width' : ''} {className}"
+    {style}
     {onclick}
     {disabled}
 >
@@ -34,29 +39,31 @@
         transition: opacity 0.2s, transform 0.1s;
     }
 
-    button:active {
+    button:active:not(:disabled) {
         transform: scale(0.98);
     }
 
     button:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+        pointer-events: none;
     }
 
     /* Botón Primario Píldora */
     .btn-pill {
         background-color: var(--bg-inverted);
         color: white;
-        border: none;
+        border: 1.5px solid transparent;
         border-radius: 9999px;
-        padding: 16px 24px;
+        padding: 12px 24px;
         font-size: 16px;
         font-weight: 500;
-        width: 100%;
-        display: flex;
+        width: fit-content;
+        display: inline-flex;
         justify-content: center;
         align-items: center;
         gap: 8px;
+        line-height: 1;
     }
 
     /* Botón Secundario Outline */
@@ -64,6 +71,11 @@
         background-color: transparent;
         color: var(--text-main);
         border: 1.5px solid var(--text-main);
+    }
+
+    /* Ancho Completo (Adaptable) */
+    .btn-full-width {
+        width: 100%;
     }
 
     /* Botón Ícono Redondo */

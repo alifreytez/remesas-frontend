@@ -1,6 +1,8 @@
 <script lang="ts">
     import '../app.css';
     import { onMount } from 'svelte';
+    import { PUBLIC_APP_NAME } from '$env/static/public';
+
     let loaded = $state(false);
     
     // Simular carga de fuente para evitar Flash of Unstyled Text
@@ -15,5 +17,9 @@
 
     let { children } = $props();
 </script>
+
+<svelte:head>
+    <title>{PUBLIC_APP_NAME || 'Remesas'}</title>
+</svelte:head>
 
 {@render children()}
