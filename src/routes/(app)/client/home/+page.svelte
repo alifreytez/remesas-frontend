@@ -52,9 +52,9 @@
     onMount(async () => {
         try {
             loadingRates = true;
-            const res = await api.get('/api/v1/finances/rates');
-            if (res.data?.success) {
-                rates = res.data.data;
+            const res = await api.get<any>('/finances/rates');
+            if (res.success) {
+                rates = res.data;
                 if (rates.length > 0) {
                     selectedRateId = rates[0].id.toString();
                 }

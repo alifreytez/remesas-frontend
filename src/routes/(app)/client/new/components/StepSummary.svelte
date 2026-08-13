@@ -7,21 +7,19 @@
         commissionAmount,
         receivedAmount,
         totalToPay,
-        selectedMethodId,
+        recipientData,
         nextStep 
     }: {
         sendAmount: string;
         commissionAmount: string;
         receivedAmount: string;
         totalToPay: string;
-        selectedMethodId: string;
+        recipientData: any;
         nextStep: () => void;
     } = $props();
 
     let methodDisplay = $derived(
-        selectedMethodId === 'pago_movil' ? 'Pago Móvil' : 
-        selectedMethodId === 'transferencia' ? 'Transferencia Bancaria' : 
-        'Método no seleccionado'
+        recipientData.method === 'pago_movil' ? 'Pago Móvil' : 'Transferencia Bancaria'
     );
 </script>
 
@@ -32,12 +30,16 @@
     <div class="summary-box">
         <div class="summary-section">
             <h4>Beneficiario</h4>
-            <p><strong>Juan Pérez</strong> (V-12345678)</p>
-            <p>Venezuela</p>
+            <p><strong>{recipientData.firstName} {recipientData.lastName}</strong> ({recipientData.document})</p>
+            <p>{recipientData.country}</p>
+            {#if recipientData.saveAsContact}
+                <p style="font-size: 12px; color: var(--primary-600); margin-top: 4px;">* Se guardará como nuevo contacto</p>
+            {/if}
         </div>
         <div class="summary-section">
             <h4>Método de Recepción</h4>
-            <p>{methodDisplay}</p>
+            <p><strong>{methodDisplay}</strong> - {recipientData.bank}</p>
+            <p>{recipientData.method === 'pago_movil' ? recipientData.phone : recipientData.accountNumber}</p>
         </div>
         <div class="summary-section highlight">
             <h4>Desglose Financiero</h4>

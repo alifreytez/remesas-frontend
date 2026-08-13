@@ -47,9 +47,19 @@
     ];
 
     // Form State
-    let selectedContactId = $state('');
-    let selectedBankDetailId = $state('');
-    let selectedMethodId = $state('');
+    let recipientData = $state({
+        isNew: true,
+        saveAsContact: false,
+        firstName: '',
+        lastName: '',
+        document: '',
+        country: '',
+        method: 'pago_movil',
+        bank: '',
+        accountNumber: '',
+        phone: '',
+        bankDocument: ''
+    });
     let sendAmount = $state('');
     let selectedRateId = $state('1');
 
@@ -104,9 +114,7 @@
         {#if currentStep === 1}
             <StepContact 
                 {contacts} 
-                bind:selectedContactId 
-                bind:selectedBankDetailId
-                bind:selectedMethodId
+                bind:recipientData
                 {nextStep} 
             />
         {:else if currentStep === 2}
@@ -125,7 +133,7 @@
                 {commissionAmount}
                 {receivedAmount}
                 {totalToPay}
-                {selectedMethodId}
+                {recipientData}
                 {nextStep} 
             />
         {:else if currentStep === 4}

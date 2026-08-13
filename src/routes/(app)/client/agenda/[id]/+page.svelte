@@ -9,6 +9,7 @@
     import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
     import { Save, AlertCircle, ShieldCheck, Info, Plus, Trash2, CreditCard, Smartphone } from 'lucide-svelte';
     import { setHeader } from '$lib/stores/header.svelte';
+    import { countriesMethods, methodsConfig } from '$lib/data/methodsConfig';
 
     let contactId = $derived(page.params.id);
     let isNew = $derived(contactId === 'new');
@@ -25,7 +26,7 @@
         );
 
         return () => {
-            // Clean up when unmounting (the layout will reset the title on navigation anyway)
+            // Clean up when unmounting
             setHeader('', false, '', null);
         };
     });
@@ -40,29 +41,43 @@
         bankDetails: [] as any[]
     });
 
-    let newBankDetail = $state({
-        method: 'pago_movil',
-        bank: '',
-        document: '',
-        phone: '',
-        accountNumber: '',
-        accountType: 'corriente'
+    let newBankDetail = $state<Record<string, any>>({
+        method: ''
     });
 
     let showAddBankForm = $state(false);
 
+    let availableMethods = $derived(
+        formData.country && countriesMethods[formData.country]
+            ? countriesMethods[formData.country]
+            : []
+    );
+
+    let currentMethodConfig = $derived(
+        newBankDetail.method && methodsConfig[newBankDetail.method]
+            ? methodsConfig[newBankDetail.method]
+            : null
+    );
+
+    $effect.pre(() => {
+        if (showAddBankForm && availableMethods.length > 0 && !availableMethods.includes(newBankDetail.method)) {
+            newBankDetail.method = availableMethods[0];
+        }
+        
+        if (currentMethodConfig) {
+            currentMethodConfig.fields.forEach(field => {
+                if (newBankDetail[field.name] === undefined) {
+                    newBankDetail[field.name] = '';
+                }
+            });
+        }
+    });
+
     function addBankDetail() {
-        if (!newBankDetail.bank) return;
+        if (!newBankDetail.method) return;
         formData.bankDetails = [...formData.bankDetails, { ...newBankDetail, id: Date.now().toString() }];
         // Reset form and hide
-        newBankDetail = {
-            method: 'pago_movil',
-            bank: '',
-            document: '',
-            phone: '',
-            accountNumber: '',
-            accountType: 'corriente'
-        };
+        newBankDetail = { method: availableMethods[0] || '' };
         showAddBankForm = false;
     }
 
@@ -78,7 +93,6 @@
     ]);
 
     onMount(async () => {
-        // Load countries from API ideally
         if (!isNew) {
             loading = true;
             // Fetch contact details mock
@@ -92,7 +106,7 @@
                     country: '1',
                     bankDetails: [
                         { id: '1', method: 'pago_movil', bank: 'Banesco', document: 'V-12345678', phone: '04121234567' },
-                        { id: '2', method: 'transferencia', bank: 'Mercantil', accountNumber: '01050000000000000000', accountType: 'corriente', document: 'V-12345678' }
+                        { id: '2', method: 'transferencia', bank: 'Mercantil', accountNumber: '01050000000000000000', document: 'V-12345678' }
                     ]
                 };
                 loading = false;
@@ -160,7 +174,7 @@
                         bind:value={formData.email}
                     />
                 </div>
-                </div> <!-- END form-fields -->
+                </div>
 
                 <div class="section-actions">
                     <Button variant="primary" type="submit" disabled={saving}>
@@ -190,20 +204,18 @@
                             {#each formData.bankDetails as bank}
                                 <div class="bank-card">
                                     <div class="bank-card-icon">
-                                        {#if bank.method === 'pago_movil'}
+                                        {#if bank.method === 'pago_movil' || bank.method === 'nequi'}
                                             <Smartphone size={24} color="var(--primary-600)" />
                                         {:else}
                                             <CreditCard size={24} color="var(--primary-600)" />
                                         {/if}
                                     </div>
                                     <div class="bank-card-info">
-                                        <strong>{bank.bank}</strong>
+                                        <strong>{bank.bank || methodsConfig[bank.method]?.name || 'Cuenta'}</strong>
                                         <span>
-                                            {#if bank.method === 'pago_movil'}
-                                                Pago Móvil • {bank.phone} • {bank.document}
-                                            {:else}
-                                                Transferencia • {bank.accountNumber}
-                                            {/if}
+                                            {methodsConfig[bank.method]?.name || 'Método Desconocido'} 
+                                            {#if bank.accountNumber} • {bank.accountNumber} {/if}
+                                            {#if bank.phone} • {bank.phone} {/if}
                                         </span>
                                     </div>
                                     <button type="button" class="remove-bank-btn" onclick={() => removeBankDetail(bank.id)}>
@@ -217,68 +229,53 @@
                     {/if}
 
                     {#if showAddBankForm}
-                    <div class="add-bank-inline">
+                        <div class="add-bank-section">
+                            {#if formData.bankDetails.length > 0}
+                                <hr class="banks-divider" />
+                            {/if}
+                            <div class="add-bank-inline">
                         <h4>Agregar Nueva Cuenta</h4>
-                        <div class="form-row" style="margin-bottom: 16px;">
-                            <Select 
-                                label="Método de Recepción" 
-                                options={[
-                                    { value: 'pago_movil', label: 'Pago Móvil' },
-                                    { value: 'transferencia', label: 'Transferencia Bancaria' }
-                                ]}
-                                bind:value={newBankDetail.method}
-                            />
-                            <Input 
-                                label="Banco" 
-                                bind:value={newBankDetail.bank}
-                            />
-                        </div>
-                        
-                        {#if newBankDetail.method === 'pago_movil'}
-                            <div class="form-row">
-                                <Input 
-                                    label="Cédula del Titular" 
-                                    bind:value={newBankDetail.document}
-                                />
-                                <Input 
-                                    label="Teléfono Afiliado" 
-                                    bind:value={newBankDetail.phone}
-                                />
-                            </div>
-                        {:else}
+                        {#if availableMethods.length > 0}
                             <div class="form-row" style="margin-bottom: 16px;">
-                                <Input 
-                                    label="Número de Cuenta (20 dígitos)" 
-                                    bind:value={newBankDetail.accountNumber}
+                                <Select 
+                                    label="Método de Recepción" 
+                                    options={availableMethods.map(m => ({ value: m, label: methodsConfig[m].name }))}
+                                    bind:value={newBankDetail.method}
                                 />
                             </div>
-                            <div class="form-row">
-                                <Input 
-                                    label="Cédula del Titular" 
-                                    bind:value={newBankDetail.document}
-                                />
-                                <Select 
-                                    label="Tipo de Cuenta" 
-                                    options={[
-                                        { value: 'corriente', label: 'Corriente' },
-                                        { value: 'ahorro', label: 'Ahorro' }
-                                    ]}
-                                    bind:value={newBankDetail.accountType}
-                                />
+                            
+                            {#if currentMethodConfig}
+                                <div class="dynamic-fields">
+                                    {#each currentMethodConfig.fields as field}
+                                        <div class="form-field-wrapper">
+                                            <Input 
+                                                label={field.label} 
+                                                type={field.type}
+                                                bind:value={newBankDetail[field.name]} 
+                                                required={field.required} 
+                                            />
+                                        </div>
+                                    {/each}
+                                </div>
+                            {/if}
+                        {:else}
+                            <div class="no-methods-alert">
+                                <p>Seleccione un país de residencia primero, o no hay métodos disponibles para el país seleccionado.</p>
                             </div>
                         {/if}
                         
                         <div class="add-bank-actions">
-                            <Button variant="outline" type="button" onclick={() => showAddBankForm = false} style="margin-right: 12px;">
+                            <Button variant="outline" type="button" onclick={() => showAddBankForm = false}>
                                 Cancelar
                             </Button>
-                            <Button variant="primary" type="button" onclick={addBankDetail} disabled={!newBankDetail.bank}>
+                            <Button variant="primary" type="button" onclick={addBankDetail} disabled={!newBankDetail.method}>
                                 <Plus size={16} /> Guardar Cuenta
                             </Button>
+                            </div>
                         </div>
                     </div>
-                {/if}
-                </div> <!-- END banks-container -->
+                    {/if}
+                </div>
             </Section>
         </form>
 
@@ -334,7 +331,6 @@
         }
     }
 
-    /* Container Queries para el formulario */
     .contact-form-container {
         display: flex;
         flex-direction: column;
@@ -354,25 +350,22 @@
         gap: 20px;
     }
 
-    .section-title {
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--gray-900);
-        border-bottom: 1px solid var(--gray-200);
-        padding-bottom: 8px;
-        margin: 0;
-    }
-
-    .form-row {
+    .form-row, .dynamic-fields {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 24px;
     }
 
     @container section (max-width: 600px) {
-        .form-row {
+        .form-row, .dynamic-fields {
             grid-template-columns: 1fr;
             gap: 16px;
+        }
+        .add-bank-actions, .section-actions {
+            flex-direction: column-reverse;
+        }
+        .add-bank-actions :global(button), .section-actions :global(button) {
+            width: 100%;
         }
     }
 
@@ -385,7 +378,6 @@
         border-top: 1px solid var(--gray-200);
     }
 
-    /* Tips Section CSS */
     .tips-container {
         position: sticky;
         top: 24px;
@@ -432,7 +424,6 @@
         margin-top: 2px;
     }
 
-    /* Bank Details UI */
     .bank-list {
         display: flex;
         flex-direction: column;
@@ -498,12 +489,23 @@
         font-style: italic;
     }
 
+    .add-bank-section {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .banks-divider {
+        border: none;
+        border-top: 1px solid var(--gray-200);
+        margin: 4px 0 24px 0;
+    }
+
     .add-bank-inline {
         background-color: var(--gray-50);
         border: 1px dashed var(--gray-300);
         border-radius: 12px;
-        padding: 24px;
-        margin-bottom: 16px;
+        padding: 24px 24px 16px 24px;
+        margin-bottom: 0;
     }
 
     .add-bank-inline h4 {
@@ -515,8 +517,18 @@
 
     .add-bank-actions {
         display: flex;
-        justify-content: flex-start;
-        margin-top: 20px;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 4px;
+    }
+
+    .no-methods-alert {
+        padding: 16px;
+        background-color: #fef2f2;
+        color: #ef4444;
+        border-radius: 8px;
+        border: 1px solid #fecaca;
+        font-size: 14px;
     }
 
     .tips-list strong {
