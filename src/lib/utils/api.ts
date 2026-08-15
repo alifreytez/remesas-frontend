@@ -75,10 +75,30 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
         if (!response.ok) {
             // Manejo global de expiración de sesión (Unauthorized)
             if (response.status === 401) {
-                if (!window.location.pathname.startsWith('/forgot')) {
-                    auth.logout();
-                    if (window.location.pathname !== '/login') {
-                        window.location.href = '/login';
+                if (endpoint !== '/auth/refresh' && !window.location.pathname.startsWith('/forgot')) {
+                    if (auth.refreshToken) {
+                        try {
+                            const newToken = await auth.doRefresh();
+                            // Reintentar la petición original con el nuevo token
+                            headers.set('Authorization', `Bearer ${newToken}`);
+                            const retryResponse = await fetch(url, { ...config, headers });
+                            
+                            if (retryResponse.status === 204) return null as unknown as T;
+                            const retryData = await retryResponse.json();
+                            if (!retryResponse.ok) throw new ApiError(retryResponse.status, retryData.message || 'Error en reintento', retryData);
+                            return retryData as T;
+                        } catch (refreshErr) {
+                            // Si falla el refresh, cerramos sesión definitivamente
+                            auth.logout();
+                            if (window.location.pathname !== '/login') window.location.href = '/login';
+                            throw new ApiError(401, 'Sesión expirada. Por favor, inicia sesión nuevamente.', refreshErr);
+                        }
+                    } else {
+                        // Si no hay refresh token, cerramos sesión directo
+                        auth.logout();
+                        if (window.location.pathname !== '/login') {
+                            window.location.href = '/login';
+                        }
                     }
                 }
             }

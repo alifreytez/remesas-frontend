@@ -7,8 +7,8 @@ export const REGEX = {
     EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
     // Teléfono: Opcional +, seguido de 10 a 15 números
     PHONE_NUMBER: /^\+?[0-9]{10,15}$/,
-    // Documento: Ajustado para cubrir desde cédulas cortas hasta pasaportes
-    DOCUMENT_NUMBER: /^(?:[a-z]{0,2}-?)[0-9]{6,12}$/i,
+    // Documento: Solo números, con la excepción de permitir opcionalmente una 'E' o 'R' al principio
+    DOCUMENT_NUMBER: /^[ER]?[0-9]{6,12}$/i,
     // Nombres: Permite tildes, Ñ, espacios internos, pero NO espacios al inicio/final
     PERSON_NAME: /^(?! )[a-zA-ZÀ-ÿ\s']{2,48}(?<! )$/
 };

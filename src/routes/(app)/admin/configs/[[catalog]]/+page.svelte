@@ -108,7 +108,7 @@
     let columns = $derived(() => {
         if (!metadata || Object.keys(metadata).length === 0) return [];
         const cols = Object.entries(metadata)
-            .filter(([_, meta]: [string, any]) => meta.visible !== false)
+            .filter(([key, meta]: [string, any]) => meta.visible !== false && key !== 'isActive')
             .sort((a: any, b: any) => (a[1].order || 99) - (b[1].order || 99))
             .map(([key, meta]: [string, any]) => {
                 // Determine format
@@ -121,7 +121,6 @@
                 else if (key.toLowerCase().includes('rate')) format = 'text'; // keep simple for rates
 
                 let label = meta.uiLabel || key;
-                if (key === 'isActive') label = 'Estado Registro';
 
                 return {
                     key,

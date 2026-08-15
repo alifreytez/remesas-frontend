@@ -1,30 +1,37 @@
 import { browser } from '$app/environment';
 import { api } from '../utils/api';
 
-type UserRole = 'ADMIN' | 'CLIENT' | null;
-
 interface UserData {
     id: string;
     email: string;
-    role: UserRole; 
     [key: string]: any;
 }
 
 class AuthStore {
     user = $state<UserData | null>(null);
     token = $state<string | null>(null);
+    refreshToken = $state<string | null>(null);
+    roles = $state<string[]>([]);
+    permissions = $state<string[]>([]);
+    
     isAuthenticated = $derived(!!this.token);
 
     constructor() {
-        // Inicializar el store desde localStorage solo si estamos en el cliente
         if (browser) {
             const savedToken = localStorage.getItem('auth_token');
+            const savedRefreshToken = localStorage.getItem('auth_refresh_token');
             const savedUser = localStorage.getItem('auth_user');
             
             if (savedToken && savedUser) {
                 try {
                     this.token = savedToken;
+                    this.refreshToken = savedRefreshToken;
                     this.user = JSON.parse(savedUser);
+                    // Fetch permissions in background to hydrate roles and permissions
+                    // Usamos setTimeout para evitar dependencias circulares de inicialización con api.ts
+                    setTimeout(() => {
+                        this.fetchPermissions();
+                    }, 0);
                 } catch (e) {
                     console.error('Error parseando datos de sesión', e);
                     this.logout();
@@ -33,39 +40,97 @@ class AuthStore {
         }
     }
 
+    async fetchPermissions() {
+        if (!this.token) return;
+        try {
+            // Set header manually just in case the api interceptor is not picking up the token in time
+            const response = await api.get<{ data: { roles: any[], permissions: any[] } }>('/users/me/permissions', {
+                headers: {
+                    Authorization: `Bearer ${this.token}`
+                }
+            });
+            
+            this.roles = (response.data.roles || []).map((r: any) => typeof r === 'string' ? r.toUpperCase() : (r.name || '').toUpperCase());
+            this.permissions = (response.data.permissions || []).map((p: any) => typeof p === 'string' ? p.toUpperCase() : (p.name || '').toUpperCase());
+        } catch (error) {
+            console.error('Error fetching permissions', error);
+        }
+    }
+
     async login(credentials: { username: string; password: string }) {
-        // Invocamos el API. Nota: ajustaremos el tipo de respuesta a la estructura de la api real
-        // Como indicaste, la API por ahora no devuelve rol, lo "simularemos"
-        const response = await api.post<{ data: { user: UserData, tokens?: { accessToken: string } } }>('/auth/login', credentials);
+        const response = await api.post<{ data: { user: UserData, tokens?: { accessToken: string, refreshToken: string } } }>('/auth/login', credentials);
         
         const backendUser = response.data.user;
         const accessToken = response.data.tokens?.accessToken;
+        const refreshTk = response.data.tokens?.refreshToken;
 
         if (!accessToken) {
             throw new Error('La API no devolvió un accessToken. Revisa la cabecera x-client-channel');
         }
 
-        // Simulación de roles "en caliente" (Si el username contiene admin es ADMIN, si no CLIENT)
-        const computedRole: UserRole = (backendUser.username || backendUser.email)?.includes('admin') ? 'ADMIN' : 'CLIENT';
-
-        this.user = { ...backendUser, role: computedRole };
+        this.user = backendUser;
         this.token = accessToken;
+        this.refreshToken = refreshTk || null;
 
         if (browser) {
             localStorage.setItem('auth_token', this.token);
+            if (this.refreshToken) {
+                localStorage.setItem('auth_refresh_token', this.refreshToken);
+            }
             localStorage.setItem('auth_user', JSON.stringify(this.user));
         }
+
+        await this.fetchPermissions();
+    }
+
+    async doRefresh() {
+        if (!this.refreshToken) throw new Error('No refresh token available');
+        const response = await api.post<{ data: { user: UserData, tokens?: { accessToken: string, refreshToken: string } } }>('/auth/refresh', {
+            refreshToken: this.refreshToken
+        });
+
+        const accessToken = response.data.tokens?.accessToken;
+        const newRefreshTk = response.data.tokens?.refreshToken;
+
+        if (accessToken) {
+            this.token = accessToken;
+            if (newRefreshTk) this.refreshToken = newRefreshTk;
+            
+            if (browser) {
+                localStorage.setItem('auth_token', this.token);
+                if (this.refreshToken) {
+                    localStorage.setItem('auth_refresh_token', this.refreshToken);
+                }
+            }
+            return accessToken;
+        }
+        throw new Error('Failed to refresh token');
     }
 
     logout() {
         this.user = null;
         this.token = null;
+        this.refreshToken = null;
+        this.roles = [];
+        this.permissions = [];
         if (browser) {
             localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_refresh_token');
             localStorage.removeItem('auth_user');
         }
     }
+
+    hasPermission(permission: string): boolean {
+        return this.permissions.includes(permission.toUpperCase());
+    }
+
+    hasAnyPermission(permissions: string[]): boolean {
+        return permissions.some(p => this.hasPermission(p));
+    }
+
+    hasRole(role: string): boolean {
+        return this.roles.includes(role.toUpperCase());
+    }
 }
 
-// Exportamos un singleton
 export const auth = new AuthStore();
