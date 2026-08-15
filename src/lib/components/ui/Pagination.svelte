@@ -5,10 +5,12 @@
         currentPage = $bindable(1),
         totalItems = 0,
         itemsPerPage = $bindable(10),
+        hasBorder = true
     } = $props<{
         currentPage?: number;
         totalItems: number;
         itemsPerPage?: number;
+        hasBorder?: boolean;
     }>();
 
     let totalPages = $derived(Math.max(1, Math.ceil(totalItems / itemsPerPage)));
@@ -44,7 +46,7 @@
     let endItem = $derived(Math.min(currentPage * itemsPerPage, totalItems));
 </script>
 
-<div class="pagination-container">
+<div class="pagination-container {hasBorder ? 'with-border' : ''}">
     <span class="pagination-info">
         Mostrando <strong>{startItem}-{endItem}</strong> de <strong>{totalItems}</strong>
     </span>
@@ -91,8 +93,11 @@
         align-items: center;
         flex-wrap: wrap;
         gap: 16px;
-        padding-top: 16px;
+    }
+    
+    .pagination-container.with-border {
         border-top: 1px solid var(--gray-200);
+        padding-top: 16px;
         margin-top: 16px;
     }
 

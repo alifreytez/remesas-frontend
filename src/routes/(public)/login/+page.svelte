@@ -21,7 +21,7 @@
 		try {
 			await auth.login({ username, password });
 
-			if (auth.user?.role === 'ADMIN') {
+			if (auth.user?.type === 'ADMIN') {
 				goto('/admin/home');
 			} else {
 				goto('/client/home');
@@ -110,7 +110,7 @@
 	.login-form {
 		display: flex;
 		flex-direction: column;
-		gap: var(--spacing-3); /* Reduced space between inputs and button */
+		gap: var(--spacing-4);
 	}
 
 	.spacer {

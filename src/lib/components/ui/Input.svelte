@@ -34,9 +34,15 @@
                 val = val.replace(/[^0-9+\-]/g, '');
                 break;
             case 'document':
-                // Solo números y letras (y guiones) - sin puntos
-                val = val.replace(/[^a-zA-Z0-9\-]/g, '');
-                break;
+                  val = val.toUpperCase();
+                  if (val.startsWith('E') || val.startsWith('R')) {
+                      const prefix = val.charAt(0);
+                      const rest = val.slice(1).replace(/[^0-9]/g, '');
+                      val = prefix + rest;
+                  } else {
+                      val = val.replace(/[^0-9]/g, '');
+                  }
+                  break;
             case 'email':
                 // Eliminar espacios de forma explícita y luego filtrar caracteres de email
                 val = val.replace(/\s/g, '').replace(/[^a-zA-Z0-9@.\-_]/g, '');
@@ -110,7 +116,6 @@
         gap: 8px;
         width: 100%;
         min-width: 0;
-        margin-bottom: 10px;
     }
 
     label {

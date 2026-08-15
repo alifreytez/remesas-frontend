@@ -78,13 +78,13 @@
     <!-- Top Row: KPIs -->
     <div class="summary-grid">
         {#each summary as item}
-            <div class="kpi-card">
+            <Card padding="20px" class="kpi-card-custom">
                 <div class="kpi-header">
-                    <svelte:component this={item.icon} size={18} color={item.color} />
+                    <svelte:component this={item.icon} size={20} color={item.color} />
                     <span class="kpi-label">{item.label}</span>
                 </div>
                 <div class="kpi-value">{item.value}</div>
-            </div>
+            </Card>
         {/each}
     </div>
 
@@ -110,16 +110,21 @@
                 {:else}
                     <div class="calc-row">
                         <div class="input-light">
-                            <label>Ruta de Envío</label>
-                            <select bind:value={selectedRateId} class="select-light">
-                                {#each getRateOptions() as opt}
-                                    <option value={opt.value}>{opt.label}</option>
-                                {/each}
-                            </select>
+                            <Select 
+                                id="rate"
+                                label="Ruta de Envío"
+                                bind:value={selectedRateId}
+                                options={getRateOptions()}
+                            />
                         </div>
                         <div class="input-light">
-                            <label>Monto a Enviar ({selectedRate?._InitialCountry?.currencySymbol || '$'})</label>
-                            <input type="number" placeholder="0.00" bind:value={sendAmount} class="input-field-light" />
+                            <Input 
+                                id="amount"
+                                label="Monto a Enviar ({selectedRate?._InitialCountry?.currencySymbol || '$'})"
+                                type="number" 
+                                placeholder="0.00" 
+                                bind:value={sendAmount} 
+                            />
                         </div>
                     </div>
 
@@ -355,34 +360,6 @@
     .input-light {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-    }
-
-    .input-light label {
-        font-size: 13px;
-        color: var(--gray-500);
-        font-weight: 500;
-    }
-
-    .select-light, .input-field-light {
-        background-color: var(--white);
-        border: 1px solid var(--gray-200);
-        border-radius: 12px;
-        padding: 12px 16px;
-        color: var(--gray-900);
-        font-size: 16px;
-        outline: none;
-        transition: border-color 0.2s;
-        font-family: inherit;
-    }
-
-    .select-light:focus, .input-field-light:focus {
-        border-color: var(--primary-600);
-    }
-    
-    .select-light option {
-        background-color: var(--white);
-        color: var(--gray-900);
     }
 
     .calc-results-light {
@@ -433,21 +410,15 @@
     }
 
     .res-val-huge {
-        font-size: 32px;
+        font-size: 24px;
         font-weight: 800;
-        color: var(--primary-600); /* highlight */
+        color: var(--primary-600);
     }
 
     .loading-text {
         color: var(--gray-500);
         text-align: center;
         padding: 48px;
-    }
-
-    .tx-list {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
     }
 
     .tx-list {

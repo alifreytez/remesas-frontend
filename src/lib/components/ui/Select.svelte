@@ -8,7 +8,8 @@
         value = $bindable(''),
         disabled = false,
         placeholder = 'Selecciona una opción',
-        required = false
+        required = false,
+        onchange
     }: {
         label?: string;
         options: { value: string; label: string }[];
@@ -16,10 +17,12 @@
         disabled?: boolean;
         placeholder?: string;
         required?: boolean;
+        onchange?: (val: string) => void;
     } = $props();
 
     let open = $state(false);
     let dropUp = $state(false);
+    let alignRight = $state(false);
     let searchQuery = $state('');
     let dropdownRef: HTMLDivElement;
 
@@ -40,8 +43,13 @@
                     const rect = dropdownRef.getBoundingClientRect();
                     const spaceBelow = window.innerHeight - rect.bottom;
                     const spaceAbove = rect.top;
+                    const spaceRight = window.innerWidth - rect.left;
+                    
                     // Si el espacio abajo es menor a 300px (aprox dropdown) y hay más espacio arriba
                     dropUp = spaceBelow < 300 && spaceAbove > spaceBelow;
+                    
+                    // Si no hay suficiente espacio a la derecha para 250px, alinear a la derecha
+                    alignRight = spaceRight < 250;
                 }
 
                 searchQuery = '';
@@ -57,6 +65,7 @@
     function selectOption(val: string) {
         value = val;
         open = false;
+        if (onchange) onchange(val);
     }
 
     function handleClickOutside(event: MouseEvent) {
@@ -91,6 +100,7 @@
     <div 
         class="select-trigger {open ? 'open' : ''} {disabled ? 'disabled' : ''}" 
         onclick={toggle}
+        title={selectedLabel}
     >
         <span class="value {value === '' ? 'placeholder' : ''}">{selectedLabel}</span>
         <div class="caret">
@@ -99,7 +109,7 @@
     </div>
 
     {#if open}
-        <div class="dropdown-menu {dropUp ? 'drop-up' : ''}">
+        <div class="dropdown-menu {dropUp ? 'drop-up' : ''} {alignRight ? 'align-right' : ''}">
             <div class="search-box">
                 <Search size={14} color="var(--text-muted)" class="search-icon" />
                 <input 
@@ -125,7 +135,7 @@
                     >
                         <span>{option.label}</span>
                         {#if option.value === value}
-                            <Check size={14} color="var(--accent-purple)" />
+                            <Check size={14} color="var(--accent-purple)" flex-shrink="0" />
                         {/if}
                     </div>
                 {/each}
@@ -140,8 +150,8 @@
         flex-direction: column;
         gap: 8px;
         width: 100%;
-        margin-bottom: var(--select-mb, 16px);
         position: relative;
+        min-width: 0;
     }
 
     label {
@@ -168,6 +178,8 @@
         cursor: pointer;
         transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
         user-select: none;
+        min-width: 0;
+        overflow: hidden;
     }
 
     .select-trigger:hover:not(.disabled) {
@@ -189,6 +201,9 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        flex: 1;
+        min-width: 0;
+        margin-right: 8px;
     }
 
     .value.placeholder {
@@ -200,6 +215,7 @@
         align-items: center;
         color: var(--text-muted);
         transition: transform 0.2s;
+        flex-shrink: 0;
     }
 
     .select-trigger.open .caret {
@@ -211,7 +227,9 @@
         position: absolute;
         top: calc(100% + 8px);
         left: 0;
-        width: 100%;
+        min-width: 100%;
+        width: max-content;
+        max-width: 250px;
         background-color: var(--bg-primary);
         border: 1px solid var(--border-color);
         border-radius: 12px;
@@ -221,15 +239,25 @@
         display: flex;
         flex-direction: column;
         animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        transform-origin: top center;
+        transform-origin: top left;
+    }
+
+    .dropdown-menu.align-right {
+        left: auto;
+        right: 0;
+        transform-origin: top right;
     }
 
     .dropdown-menu.drop-up {
         top: auto;
         bottom: calc(100% + 8px);
         animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        transform-origin: bottom center;
+        transform-origin: bottom left;
         box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .dropdown-menu.drop-up.align-right {
+        transform-origin: bottom right;
     }
 
     @keyframes slideDown {
@@ -286,6 +314,16 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        overflow: hidden;
+    }
+
+    .option span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex: 1;
+        min-width: 0;
+        margin-right: 8px;
     }
 
     .option:hover {

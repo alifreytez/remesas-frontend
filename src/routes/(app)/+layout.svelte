@@ -1,5 +1,6 @@
 <script lang="ts">
     import { auth } from '$lib/stores/auth.svelte';
+    import { headerState } from '$lib/stores/header.svelte';
     import Sidebar from '$lib/components/layout/Sidebar.svelte';
     import Header from '$lib/components/layout/Header.svelte';
     import BottomNav from '$lib/components/layout/BottomNav.svelte';
@@ -17,12 +18,15 @@
 
     let currentPath = $derived(page.url.pathname);
     let pageTitle = $derived(
+        headerState.title ? headerState.title :
         currentPath.includes('/home') ? 'Inicio' :
         currentPath.includes('/agenda/new') ? 'Nuevo Contacto' :
         (currentPath.includes('/agenda/') && !currentPath.endsWith('/agenda')) ? 'Editar Contacto' :
         currentPath.includes('/agenda') ? 'Contactos' :
         currentPath.includes('/history') ? 'Historial de Operaciones' :
         currentPath.includes('/client/new') ? 'Nueva Remesa' :
+        currentPath.includes('/admin/users') ? 'Usuarios' :
+        currentPath.includes('/admin/remittances') ? 'Remesas' :
         'Dashboard'
     );
 </script>

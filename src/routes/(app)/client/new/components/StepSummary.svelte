@@ -1,6 +1,10 @@
 <script lang="ts">
     import { ArrowRight } from 'lucide-svelte';
     import Button from '$lib/components/ui/Button.svelte';
+    import Grid from '$lib/components/ui/Grid.svelte';
+    import Stack from '$lib/components/ui/Stack.svelte';
+    import SectionAccordion from '$lib/components/ui/SectionAccordion.svelte';
+    import { methodsConfig } from '$lib/data/methodsConfig';
     
     let { 
         sendAmount,
@@ -8,6 +12,8 @@
         receivedAmount,
         totalToPay,
         recipientData,
+        selectedRate,
+        prevStep,
         nextStep 
     }: {
         sendAmount: string;
@@ -15,54 +21,86 @@
         receivedAmount: string;
         totalToPay: string;
         recipientData: any;
+        selectedRate: any;
+        prevStep: () => void;
         nextStep: () => void;
     } = $props();
 
     let methodDisplay = $derived(
-        recipientData.method === 'pago_movil' ? 'Pago Móvil' : 'Transferencia Bancaria'
+        methodsConfig[recipientData.method]?.name || 'Transferencia Bancaria'
     );
 </script>
 
 <div class="step-content">
-    <h2 class="step-title">Resumen de la Remesa</h2>
-    <p class="step-desc">Verifica que todos los datos sean correctos antes de proceder al pago.</p>
+    <Stack gap="var(--spacing-6)">
+        <div class="header-text">
+            <h2 class="step-title">Resumen de la Remesa</h2>
+            <p class="step-desc">Verifica que todos los datos sean correctos antes de proceder al pago.</p>
+        </div>
 
-    <div class="summary-box">
-        <div class="summary-section">
-            <h4>Beneficiario</h4>
-            <p><strong>{recipientData.firstName} {recipientData.lastName}</strong> ({recipientData.document})</p>
-            <p>{recipientData.country}</p>
-            {#if recipientData.saveAsContact}
-                <p style="font-size: 12px; color: var(--primary-600); margin-top: 4px;">* Se guardará como nuevo contacto</p>
-            {/if}
-        </div>
-        <div class="summary-section">
-            <h4>Método de Recepción</h4>
-            <p><strong>{methodDisplay}</strong> - {recipientData.bank}</p>
-            <p>{recipientData.method === 'pago_movil' ? recipientData.phone : recipientData.accountNumber}</p>
-        </div>
-        <div class="summary-section highlight">
-            <h4>Desglose Financiero</h4>
-            <div class="summary-row">
-                <span>Monto a Enviar:</span>
-                <strong>USD {sendAmount}</strong>
+        <Grid cols={2}>
+            <SectionAccordion title="Datos del Beneficiario" defaultOpen={true}>
+                <div class="summary-details">
+                    <div class="detail-row">
+                        <span class="label">Nombre:</span>
+                        <span class="value">{recipientData.firstName} {recipientData.lastName}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Documento:</span>
+                        <span class="value">{recipientData.document}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">País:</span>
+                        <span class="value">{recipientData.country === '1' ? 'Venezuela' : 'Otro'}</span>
+                    </div>
+                </div>
+            </SectionAccordion>
+
+            <SectionAccordion title="Datos de Recepción" defaultOpen={true}>
+                <div class="summary-details">
+                    <div class="detail-row">
+                        <span class="label">Método:</span>
+                        <span class="value">{methodDisplay}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Entidad:</span>
+                        <span class="value">{recipientData.bank || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="label">Cuenta/Teléfono:</span>
+                        <span class="value">{recipientData.accountNumber || recipientData.phone || 'N/A'}</span>
+                    </div>
+                </div>
+            </SectionAccordion>
+        </Grid>
+
+        <SectionAccordion title="Desglose Financiero" defaultOpen={true}>
+            <div class="financial-box">
+                <div class="fin-row">
+                    <span>Monto Enviado:</span>
+                    <strong>{selectedRate.originCurrency.code} {sendAmount}</strong>
+                </div>
+                <div class="fin-row">
+                    <span>Comisión Administrativa:</span>
+                    <strong>{selectedRate.originCurrency.code} {commissionAmount}</strong>
+                </div>
+                <div class="divider"></div>
+                <div class="fin-row total-pay">
+                    <span>Monto Total a Pagar:</span>
+                    <span>{selectedRate.originCurrency.code} {totalToPay}</span>
+                </div>
+                <div class="fin-row receive">
+                    <span>Monto a Recibir:</span>
+                    <span>{selectedRate.destinationCurrency.symbol} {receivedAmount}</span>
+                </div>
             </div>
-            <div class="summary-row">
-                <span>Comisión:</span>
-                <strong>USD {commissionAmount}</strong>
-            </div>
-            <div class="summary-row total">
-                <span>Total a Pagar:</span>
-                <strong>USD {totalToPay}</strong>
-            </div>
-            <div class="summary-row receive mt-2">
-                <span>Monto a Recibir:</span>
-                <strong>Bs {receivedAmount}</strong>
-            </div>
-        </div>
-    </div>
+        </SectionAccordion>
+    </Stack>
 
     <div class="actions">
+        <Button variant="outline" type="button" onclick={prevStep}>
+            Atrás
+        </Button>
         <Button variant="primary" onclick={nextStep}>
             Confirmar y Pagar <ArrowRight size={16} />
         </Button>
@@ -73,79 +111,98 @@
     .step-content {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+    }
+
+    .header-text {
+        margin-bottom: var(--spacing-2);
     }
 
     .step-title {
-        font-size: 20px;
+        font-size: 24px;
         font-weight: 700;
         color: var(--gray-900);
-        margin: 0;
+        margin: 0 0 4px 0;
     }
 
     .step-desc {
         color: var(--gray-500);
-        margin: 0 0 24px 0;
+        margin: 0;
         font-size: 14px;
     }
 
-    .summary-box {
-        border: 1px solid var(--gray-200);
-        border-radius: 12px;
-        overflow: hidden;
+    .summary-details {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-3);
     }
 
-    .summary-section {
-        padding: 16px;
-        border-bottom: 1px solid var(--gray-200);
+    .detail-row {
+        display: flex;
+        flex-direction: column;
     }
 
-    .summary-section:last-child {
-        border-bottom: none;
-    }
-
-    .summary-section h4 {
-        margin: 0 0 8px 0;
+    .detail-row .label {
+        font-size: 12px;
         color: var(--gray-500);
-        font-size: 13px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
 
-    .summary-section p {
-        margin: 0;
+    .detail-row .value {
+        font-size: 15px;
+        color: var(--gray-900);
+        font-weight: 500;
+    }
+
+    .financial-box {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-3);
+    }
+
+    .fin-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 14px;
+        color: var(--gray-600);
+    }
+
+    .fin-row strong {
+        color: var(--gray-900);
+        font-weight: 600;
+    }
+
+    .divider {
+        height: 1px;
+        background-color: var(--gray-200);
+        margin: var(--spacing-2) 0;
+    }
+
+    .total-pay {
+        font-size: 16px;
+        font-weight: 700;
         color: var(--gray-900);
     }
 
-    .summary-section.highlight {
-        background-color: var(--gray-50);
-    }
-
-    .summary-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 8px;
-    }
-    
-    .total {
-        margin-top: 12px;
-        padding-top: 12px;
-        border-top: 1px dashed var(--gray-300);
-        font-size: 16px;
-    }
-
     .receive {
+        margin-top: var(--spacing-2);
+        background-color: #f3e8ff;
+        padding: var(--spacing-4);
+        border-radius: var(--radius-md);
         color: var(--primary-700);
         font-size: 18px;
-    }
-
-    .mt-2 {
-        margin-top: 8px;
+        font-weight: 700;
     }
 
     .actions {
-        margin-top: 32px;
         display: flex;
+        flex-direction: row;
         justify-content: flex-end;
+        gap: var(--spacing-4);
+        margin-top: var(--spacing-8);
+        width: 100%;
+        border-top: 1px solid var(--gray-200);
+        padding-top: var(--spacing-6);
     }
 </style>

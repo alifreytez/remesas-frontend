@@ -5,13 +5,28 @@
     import { LayoutDashboard, Users, FileText, Settings, LogOut, Send, History, Contact } from 'lucide-svelte';
 
     let currentPath = $derived(page.url.pathname);
-    let role = $derived(auth.user?.role || 'CLIENT');
+    let isAdmin = $derived(auth.user?.type === 'ADMIN');
 
-    const adminMenu = [
-        { path: '/admin/home', label: 'Dashboard', icon: LayoutDashboard },
-        { path: '/admin/remittances', label: 'Remesas', icon: FileText },
-        { path: '/admin/configs', label: 'Configuración', icon: Settings },
-    ];
+    let adminMenu = $derived.by(() => {
+        const menu = [
+            // El inicio del admin se asume siempre visible para cualquiera que tenga rol ADMIN
+            { path: '/admin/home', label: 'Dashboard', icon: LayoutDashboard }
+        ];
+
+        if (auth.hasPermission('UI:VIEW:REMITTANCES')) {
+            menu.push({ path: '/admin/remittances', label: 'Remesas', icon: FileText });
+        }
+        
+        if (auth.hasPermission('UI:VIEW:USERS')) {
+            menu.push({ path: '/admin/users', label: 'Usuarios', icon: Users });
+        }
+        
+        if (auth.hasPermission('UI:VIEW:CONFIGS')) {
+            menu.push({ path: '/admin/configs', label: 'Configuración', icon: Settings });
+        }
+        
+        return menu;
+    });
 
     const clientMenu = [
         { path: '/client/home', label: 'Inicio', icon: LayoutDashboard },
@@ -20,7 +35,7 @@
         { path: '/client/agenda', label: 'Contactos', icon: Contact },
     ];
 
-    let activeMenu = $derived(role === 'ADMIN' ? adminMenu : clientMenu);
+    let activeMenu = $derived(isAdmin ? adminMenu : clientMenu);
 
     function handleLogout() {
         auth.logout();
@@ -30,7 +45,7 @@
 
 <aside class="sidebar">
     <div class="sidebar-header">
-        <div class="logo">Remesas{role === 'ADMIN' ? 'Admin' : ''}</div>
+        <div class="logo">Remesas{isAdmin ? 'Admin' : ''}</div>
     </div>
     
     <nav class="sidebar-nav">

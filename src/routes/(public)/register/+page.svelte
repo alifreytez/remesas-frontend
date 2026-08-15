@@ -176,7 +176,7 @@
     .register-form {
         display: flex;
         flex-direction: column;
-        gap: var(--spacing-3);
+        gap: var(--spacing-4);
     }
     
     .spacer {
