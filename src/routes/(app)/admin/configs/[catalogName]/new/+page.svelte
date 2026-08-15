@@ -59,7 +59,7 @@
     let formFields = $derived(() => {
         if (!metadata) return [];
         return Object.entries(metadata)
-            .filter(([_, meta]: [string, any]) => meta.editable !== false)
+            .filter(([key, meta]: [string, any]) => meta.editable !== false && key !== 'isActive')
             .sort((a: any, b: any) => (a[1].order || 99) - (b[1].order || 99))
             .map(([key, meta]: [string, any]) => ({ key, ...meta }));
     });
