@@ -91,7 +91,7 @@
                 
                 tableData = rows.map((r: any) => ({
                     ...r,
-                    __estado_registro: !r.deletedAt
+                    __estado_registro: !r.deletedAt ? 'Activo' : 'Eliminado'
                 }));
             } catch (err) {
                 console.error(err);
@@ -144,13 +144,17 @@
             key: '__estado_registro',
             label: 'Estado Registro',
             filterType: 'select',
-            format: 'switch',
+            format: 'badge',
+            badgeMap: {
+                'Activo': 'success',
+                'Eliminado': 'danger'
+            },
             width: '150px',
             align: 'center',
             filterOptions: [
                 { value: '', label: 'Todos' },
-                { value: 'true', label: 'Activos' },
-                { value: 'false', label: 'Inactivos' }
+                { value: 'Activo', label: 'Activos' },
+                { value: 'Eliminado', label: 'Eliminados' }
             ]
         });
 
@@ -165,38 +169,32 @@
         goto(`/admin/configs/${selectedCatalog}/${row.id}`);
     };
 
-    const handleSwitchChange = async (row: any, key: string, checked: boolean) => {
-        if (key === '__estado_registro') {
-            if (checked) {
-                if (!confirm('¿Estás seguro de habilitar este registro?')) {
-                    tableData = [...tableData];
-                    return;
-                }
-                try {
-                    await api.patch(`/catalogs/${selectedCatalog}/${row.id}/restore`);
-                    row.deletedAt = null;
-                    row.__estado_registro = true;
-                    tableData = [...tableData];
-                } catch (e) {
-                    console.error(e);
-                    alert('Error al habilitar');
-                    tableData = [...tableData];
-                }
-            } else {
-                if (!confirm('¿Estás seguro de deshabilitar este registro?')) {
-                    tableData = [...tableData];
-                    return;
-                }
-                try {
-                    await api.delete(`/catalogs/${selectedCatalog}/${row.id}`);
-                    row.deletedAt = new Date().toISOString();
-                    row.__estado_registro = false;
-                    tableData = [...tableData];
-                } catch (e) {
-                    console.error(e);
-                    alert('Error al deshabilitar');
-                    tableData = [...tableData];
-                }
+    const handleStatusChange = async (row: any, action: 'delete' | 'restore') => {
+        if (action === 'restore') {
+            if (!confirm('¿Estás seguro de restaurar este registro?')) {
+                return;
+            }
+            try {
+                await api.patch(`/catalogs/${selectedCatalog}/${row.id}/restore`);
+                row.deletedAt = null;
+                row.__estado_registro = 'Activo';
+                tableData = [...tableData];
+            } catch (e) {
+                console.error(e);
+                alert('Error al restaurar');
+            }
+        } else if (action === 'delete') {
+            if (!confirm('¿Estás seguro de eliminar este registro?')) {
+                return;
+            }
+            try {
+                await api.delete(`/catalogs/${selectedCatalog}/${row.id}`);
+                row.deletedAt = new Date().toISOString();
+                row.__estado_registro = 'Eliminado';
+                tableData = [...tableData];
+            } catch (e) {
+                console.error(e);
+                alert('Error al eliminar');
             }
         }
     };
@@ -244,12 +242,16 @@
                         variant="v2"
                         paginated={true}
                         hasActions={auth.hasPermission('UI:UPDATE:CONFIGS')}
-                        onswitch={handleSwitchChange}
                     >
                         {#snippet actions(row)}
                             <div class="actions-group">
                                 <PermissionGuard permission="UI:UPDATE:CONFIGS">
                                     <button class="action-btn edit" onclick={() => handleEdit(row)} title="Editar"><Edit2 size={16} /></button>
+                                    {#if row.__estado_registro === 'Activo'}
+                                        <button class="action-btn delete" onclick={() => handleStatusChange(row, 'delete')} title="Eliminar"><Trash2 size={16} /></button>
+                                    {:else}
+                                        <button class="action-btn restore" onclick={() => handleStatusChange(row, 'restore')} title="Restaurar"><RotateCcw size={16} /></button>
+                                    {/if}
                                 </PermissionGuard>
                             </div>
                         {/snippet}
@@ -311,5 +313,21 @@
 
     .action-btn.edit:hover {
         background: var(--primary-50);
+    }
+
+    .action-btn.delete {
+        color: var(--danger-600);
+    }
+
+    .action-btn.delete:hover {
+        background: var(--danger-50);
+    }
+
+    .action-btn.restore {
+        color: var(--warning-600);
+    }
+
+    .action-btn.restore:hover {
+        background: var(--warning-50);
     }
 </style>
