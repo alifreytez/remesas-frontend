@@ -7,99 +7,96 @@
     import Button from '$lib/components/ui/Button.svelte';
     import Section from '$lib/components/layout/Section.svelte';
     import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
-    import Stack from '$lib/components/ui/Stack.svelte';
-    import { UserPlus, Edit2, Trash2 } from 'lucide-svelte';
+    import { ShieldPlus, Edit2, Trash2 } from 'lucide-svelte';
     import { fly } from 'svelte/transition';
-    import UserForm from '$lib/components/admin/UserForm.svelte';
+    import RoleForm from '$lib/components/admin/RoleForm.svelte';
     
-    let users = $state<any[]>([]);
+    let roles = $state<any[]>([]);
     let loading = $state(true);
     let error = $state<string | null>(null);
 
     // Slide View State
     let currentView = $state<'list' | 'form'>('list');
-    let selectedUserId = $state<string | number | null>(null);
+    let selectedRoleId = $state<string | number | null>(null);
 
     $effect(() => {
-        setHeader('Directorio de Usuarios', false, '', null);
+        setHeader('Directorio de Roles y Permisos', false, '', null);
         return () => {
             setHeader('', false, '', null);
         };
     });
 
     $effect(() => {
-        if (currentView === 'list' && auth.hasPermission('UI:VIEW:USERS')) {
-            fetchUsers();
+        if (currentView === 'list' && auth.hasPermission('UI:VIEW:ROLES')) {
+            fetchRoles();
         }
     });
 
-    async function fetchUsers() {
+    async function fetchRoles() {
         try {
             loading = true;
-            const response = await api.get<{ data: { rows: any[] } }>('/users');
-            users = response.data.rows || [];
+            const response = await api.get<{ data: { rows: any[] } }>('/roles?limit=500');
+            roles = response.data?.rows || response.data || [];
         } catch (err: any) {
-            error = err.message || 'Error al cargar usuarios';
+            error = err.message || 'Error al cargar roles';
         } finally {
             loading = false;
         }
     }
 
-    function openForm(userId: string | number | null = null) {
-        selectedUserId = userId;
+    function openForm(roleId: string | number | null = null) {
+        selectedRoleId = roleId;
         currentView = 'form';
     }
 
     function closeForm() {
         currentView = 'list';
-        selectedUserId = null;
+        selectedRoleId = null;
     }
 
-    async function handleDelete(userId: string | number) {
-        if (confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
+    async function handleDelete(roleId: string | number) {
+        if (confirm('¿Estás seguro de que deseas eliminar este rol? Esta acción puede afectar a todos los usuarios que lo tengan asignado.')) {
             try {
-                await api.delete(`/users/${userId}`);
-                await fetchUsers();
+                await api.delete(`/roles/${roleId}`);
+                await fetchRoles();
             } catch (err: any) {
-                alert(err.message || 'Error al eliminar usuario');
+                alert(err.message || 'Error al eliminar rol');
             }
         }
     }
 
     // Configuración de la tabla
     const columns = [
-        { key: 'username', label: 'Usuario', filterType: 'text' as const },
-        { key: 'email', label: 'Correo', filterType: 'text' as const },
-        { key: 'document_number', label: 'Cédula', filterType: 'text' as const },
-        { key: 'roles', label: 'Roles', filterType: 'text' as const },
+        { key: 'code', label: 'Código', filterType: 'text' as const },
+        { key: 'description', label: 'Descripción', filterType: 'text' as const },
+        { key: 'parent_roles', label: 'Hereda de', filterType: 'text' as const },
         { key: 'status', label: 'Estado', format: 'badge' as const, badgeMap: { 'Activo': 'success', 'Inactivo': 'danger' } }
     ];
 
     // Formatear los datos para la tabla
-    let tableData = $derived(users.map(u => ({
-        id: u.id,
-        username: u.username,
-        email: u.email,
-        document_number: u._Person?.documentNumber || 'N/A',
-        status: (u.deletedAt || u.deleted_at) ? 'Inactivo' : 'Activo',
-        roles: (u._Roles || []).map((r: any) => r.code).join(', ')
+    let tableData = $derived(roles.map(r => ({
+        id: r.id,
+        code: r.code,
+        description: r.description || 'Sin descripción',
+        parent_roles: r.parentRoles && r.parentRoles.length > 0 ? r.parentRoles.map((pr: any) => pr.code || pr.name).join(', ') : 'Ninguno',
+        status: (r.deletedAt || r.deleted_at) ? 'Inactivo' : 'Activo'
     })));
 </script>
 
-<PermissionGuard permission="UI:VIEW:USERS">
-    <div class="users-page">
+<PermissionGuard permission="UI:VIEW:ROLES">
+    <div class="roles-page">
         <Section>
             <SectionTitle 
-                title={currentView === 'form' ? (selectedUserId ? 'Editar Usuario' : 'Nuevo Usuario') : 'Gestión de Accesos'}
-                subtitle={currentView === 'form' ? 'Modifica los datos del usuario y sus permisos.' : 'Administra los accesos, roles y datos personales de los miembros de la plataforma.'}
+                title={currentView === 'form' ? (selectedRoleId ? 'Editar Rol' : 'Nuevo Rol') : 'Gestión de Seguridad y Accesos'}
+                subtitle={currentView === 'form' ? 'Modifica los datos del rol, sus permisos y herencias.' : 'Administra los roles del sistema, sus jerarquías y políticas de acceso.'}
                 onBack={currentView === 'form' ? closeForm : undefined}
             >
                 {#snippet action()}
                     {#if currentView === 'list'}
-                        <PermissionGuard permission="UI:CREATE:USERS">
+                        <PermissionGuard permission="UI:CREATE:ROLES">
                             <Button variant="primary" onclick={() => openForm(null)}>
-                                <UserPlus size={18} />
-                                Nuevo Usuario
+                                <ShieldPlus size={18} />
+                                Nuevo Rol
                             </Button>
                         </PermissionGuard>
                     {/if}
@@ -109,16 +106,15 @@
             <div class="view-slider-container">
                 {#if currentView === 'form'}
                     <div class="slide-view" in:fly={{ x: 50, duration: 300 }} out:fly={{ x: 50, duration: 300 }}>
-                        <UserForm 
-                            recordId={selectedUserId} 
+                        <RoleForm 
+                            recordId={selectedRoleId} 
                             onSuccess={closeForm} 
-                            onCancel={closeForm} 
                         />
                     </div>
                 {:else}
                     <div class="slide-view" in:fly={{ x: -50, duration: 300 }} out:fly={{ x: -50, duration: 300 }}>
                         {#if loading}
-                            <div class="loading-state">Cargando usuarios...</div>
+                            <div class="loading-state">Cargando roles...</div>
                         {:else if error}
                             <div class="error-state">{error}</div>
                         {:else}
@@ -127,16 +123,16 @@
                                 data={tableData}
                                 variant="v2"
                                 paginated={true}
-                                hasActions={auth.hasPermission('UI:UPDATE:USERS') || auth.hasPermission('UI:DELETE:USERS')}
+                                hasActions={auth.hasPermission('UI:UPDATE:ROLES') || auth.hasPermission('UI:DELETE:ROLES')}
                             >
                                 {#snippet actions(row)}
                                     <div class="actions-group">
-                                        <PermissionGuard permission="UI:UPDATE:USERS">
+                                        <PermissionGuard permission="UI:UPDATE:ROLES">
                                             <button class="action-icon-btn edit" title="Editar" onclick={() => openForm(row.id)}>
                                                 <Edit2 size={16} />
                                             </button>
                                         </PermissionGuard>
-                                        <PermissionGuard permission="UI:DELETE:USERS">
+                                        <PermissionGuard permission="UI:DELETE:ROLES">
                                             <button class="action-icon-btn delete" title="Eliminar" onclick={() => handleDelete(row.id)}>
                                                 <Trash2 size={16} />
                                             </button>
@@ -153,7 +149,7 @@
 </PermissionGuard>
 
 <style>
-    .users-page {
+    .roles-page {
         padding: 0;
     }
 

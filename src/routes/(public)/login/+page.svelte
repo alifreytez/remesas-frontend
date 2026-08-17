@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
+	import { USER_TYPES } from '$lib/constants/auth';
 	import { REGEX } from '$lib/constants/regex';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -21,7 +22,7 @@
 		try {
 			await auth.login({ username, password });
 
-			if (auth.user?.type === 'ADMIN') {
+			if (auth.user?.userType === USER_TYPES.ADMIN) {
 				goto('/admin/home');
 			} else {
 				goto('/client/home');
@@ -53,7 +54,7 @@
 			type="text"
 			format="document"
 			bind:value={username}
-			placeholder="Ej: 12345678ab"
+			placeholder="Ej: 12345678"
 			required
 		/>
 

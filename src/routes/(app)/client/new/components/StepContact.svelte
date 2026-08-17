@@ -8,7 +8,7 @@
     import Grid from '$lib/components/ui/Grid.svelte';
     import Stack from '$lib/components/ui/Stack.svelte';
     import HintText from '$lib/components/ui/HintText.svelte';
-    import { countriesMethods, methodsConfig } from '$lib/data/methodsConfig';
+    import { methodsConfig } from '$lib/data/methodsConfig';
     
     let { 
         contacts,
@@ -31,11 +31,7 @@
         { id: '4', name: 'Chile' }
     ];
 
-    let availableMethods = $derived(
-        recipientData.country && countriesMethods[recipientData.country] 
-            ? countriesMethods[recipientData.country] 
-            : []
-    );
+    let availableMethods = Object.keys(methodsConfig);
 
     let currentMethodConfig = $derived(
         recipientData.method && methodsConfig[recipientData.method]
@@ -195,9 +191,7 @@
             </SectionAccordion>
 
             <SectionAccordion title="Datos Bancarios">
-                {#if !recipientData.country}
-                    <HintText text="Seleccione el país de residencia para cargar opciones" />
-                {:else if availableMethods.length > 0}
+                {#if availableMethods.length > 0}
                     <Grid cols={1}>
                         <Select 
                             label="Método de Recepción" 
@@ -221,7 +215,7 @@
                         </Grid>
                     {/if}
                 {:else}
-                    <HintText text="No hay métodos de pago disponibles para este país actualmente." />
+                    <HintText text="No hay métodos de pago disponibles actualmente." />
                 {/if}
             </SectionAccordion>
 

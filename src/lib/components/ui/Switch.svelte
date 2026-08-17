@@ -32,8 +32,8 @@
 <style>
     .switch {
         position: relative;
-        width: 44px;
-        height: 24px;
+        width: 36px;
+        height: 20px;
         background-color: var(--text-muted);
         border-radius: 20px;
         cursor: pointer;
@@ -54,8 +54,8 @@
     }
 
     .thumb {
-        width: 20px;
-        height: 20px;
+        width: 16px;
+        height: 16px;
         background-color: white;
         border-radius: 50%;
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -64,6 +64,6 @@
     }
 
     .switch.checked .thumb {
-        transform: translateX(20px);
+        transform: translateX(16px);
     }
 </style>

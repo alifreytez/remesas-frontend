@@ -1,14 +1,22 @@
 <script lang="ts">
     import type { Snippet } from 'svelte';
+    import { ArrowLeft } from 'lucide-svelte';
     
-    let { title = '', subtitle = '', action }: { title: string, subtitle?: string, action?: Snippet } = $props();
+    let { title = '', subtitle = '', action, onBack }: { title: string, subtitle?: string, action?: Snippet, onBack?: () => void } = $props();
 </script>
 
 <div class="panel-header">
     <div class="title-group">
-        <h3 class="panel-title {subtitle ? 'has-subtitle' : ''}">{title}</h3>
+        <div class="title-row">
+            {#if onBack}
+                <button class="back-button" onclick={onBack} aria-label="Volver">
+                    <ArrowLeft size={20} strokeWidth={2.5} />
+                </button>
+            {/if}
+            <h3 class="panel-title {subtitle ? 'has-subtitle' : ''}">{title}</h3>
+        </div>
         {#if subtitle}
-            <p class="panel-subtitle">{subtitle}</p>
+            <p class="panel-subtitle {onBack ? 'with-back' : ''}">{subtitle}</p>
         {/if}
     </div>
     {#if action}
@@ -23,8 +31,8 @@
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: var(--section-gap);
-        min-height: 36px;
+        margin-bottom: 24px;
+        min-height: 40px;
         gap: 16px;
     }
 
@@ -33,7 +41,32 @@
         display: flex;
         flex-direction: column;
         justify-content: center;
-        min-height: 36px;
+        min-height: 40px;
+    }
+
+    .title-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .back-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--gray-100);
+        border: 1px solid var(--gray-200);
+        color: var(--gray-700);
+        cursor: pointer;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+
+    .back-button:hover {
+        background-color: var(--gray-200);
+        color: var(--gray-900);
     }
 
     .panel-title {
@@ -54,7 +87,7 @@
     
     .panel-title:not(.has-subtitle) {
         align-content: center;
-        min-height: 36px;
+        min-height: 40px;
     }
 
     .panel-subtitle {
@@ -63,9 +96,13 @@
         margin: 4px 0 0 0;
     }
 
+    .panel-subtitle.with-back {
+        margin-left: 42px; /* 32px button width + 10px gap */
+    }
+
     .panel-action {
         display: flex;
         align-items: center;
-        min-height: 36px;
+        min-height: 40px;
     }
 </style>

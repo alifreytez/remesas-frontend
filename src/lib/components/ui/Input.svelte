@@ -148,7 +148,8 @@
         background-color: var(--bg-secondary);
         border: 1px solid var(--border-color);
         border-radius: 12px;
-        padding: 14px 16px;
+        padding: 0 16px;
+        height: 46px;
         font-size: 14px;
         color: var(--text-main);
         outline: none;

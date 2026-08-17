@@ -55,7 +55,7 @@
         loading = true;
         try {
             await auth.login({ username: generatedUsername, password: formData.password });
-            if (auth.user?.role === 'ADMIN') {
+            if (auth.user?.userType === USER_TYPES.ADMIN) {
                 goto('/admin/home');
             } else {
                 goto('/client/home');

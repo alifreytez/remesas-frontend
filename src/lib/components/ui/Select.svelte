@@ -172,7 +172,8 @@
         background-color: var(--select-bg, var(--bg-secondary));
         border: 1px solid var(--border-color);
         border-radius: var(--select-radius, 12px);
-        padding: var(--select-padding, 14px 16px);
+        padding: var(--select-padding, 0 16px);
+        height: var(--select-height, 46px);
         font-size: var(--select-font-size, 14px);
         color: var(--text-main);
         cursor: pointer;
@@ -180,6 +181,7 @@
         user-select: none;
         min-width: 0;
         overflow: hidden;
+        box-sizing: border-box;
     }
 
     .select-trigger:hover:not(.disabled) {

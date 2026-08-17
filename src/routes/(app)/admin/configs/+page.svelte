@@ -3,6 +3,7 @@
     import PermissionGuard from '$lib/components/auth/PermissionGuard.svelte';
     import { auth } from '$lib/stores/auth.svelte';
     import { api } from '$lib/utils/api';
+    import { confirm, alertMsg } from '$lib/stores/confirm.svelte';
     import Table from '$lib/components/ui/Table.svelte';
     import Button from '$lib/components/ui/Button.svelte';
     import Stack from '$lib/components/ui/Stack.svelte';
@@ -12,12 +13,18 @@
     import { Plus, Edit2, Trash2, RotateCcw } from 'lucide-svelte';
     import { goto } from '$app/navigation';
     import { page } from '$app/stores';
+    import { configState } from '$lib/stores/config.svelte';
+    import CatalogForm from '$lib/components/admin/CatalogForm.svelte';
+    import { fly } from 'svelte/transition';
     
     // States
     let catalogsList = $state<{value: string, label: string}[]>([]);
-    let selectedCatalog = $state<string>($page.params.catalog || '');
     let metadata = $state<Record<string, any>>({});
     let tableData = $state<any[]>([]);
+    
+    let currentView = $state<'list' | 'form'>('list');
+    let editingRecordId = $state<string | null>(null);
+    let refreshTrigger = $state(0);
     
     let loadingCatalogs = $state(true);
     let loadingMetadata = $state(false);
@@ -30,17 +37,8 @@
 
     // Handle catalog selection change
     function handleCatalogChange(val: string) {
-        if (val) {
-            goto(`/admin/configs/${val}`, { keepFocus: true });
-        }
+        configState.selectedCatalog = val;
     }
-
-    // Sync selectedCatalog with URL params
-    $effect(() => {
-        if ($page.params.catalog && $page.params.catalog !== selectedCatalog) {
-            selectedCatalog = $page.params.catalog;
-        }
-    });
 
     // Load available catalogs on mount
     $effect(() => {
@@ -52,10 +50,6 @@
                         value: c.name,
                         label: c.uiName || c.name
                     }));
-                    if (catalogsList.length > 0 && !selectedCatalog) {
-                        selectedCatalog = catalogsList[0].value;
-                        goto(`/admin/configs/${selectedCatalog}`, { replaceState: true });
-                    }
                 }
             } catch (err) {
                 console.error('Error cargando catálogos:', err);
@@ -68,7 +62,14 @@
 
     // Load metadata and data when selectedCatalog changes
     $effect(() => {
-        if (!selectedCatalog) return;
+        // Trackeamos el trigger para forzar refresco post-guardado
+        const t = refreshTrigger;
+        
+        if (!configState.selectedCatalog) {
+            metadata = {};
+            tableData = [];
+            return;
+        }
         
         const loadCatalog = async () => {
             try {
@@ -76,11 +77,11 @@
                 loadingData = true;
                 
                 // Fetch Metadata
-                const metaRes = await api.get<{ data: Record<string, any> }>(`/catalogs/${selectedCatalog}/metadata`);
+                const metaRes = await api.get<{ data: Record<string, any> }>(`/catalogs/${configState.selectedCatalog}/metadata`);
                 metadata = metaRes.data || {};
                 
                 // Fetch Data
-                const dataRes = await api.get<any>(`/catalogs/${selectedCatalog}?include=true&includeDeleted=true`);
+                const dataRes = await api.get<any>(`/catalogs/${configState.selectedCatalog}?include=true&includeDeleted=true`);
                 
                 let rows = [];
                 if (dataRes?.data?.rows) rows = dataRes.data.rows;
@@ -91,7 +92,7 @@
                 
                 tableData = rows.map((r: any) => ({
                     ...r,
-                    __estado_registro: !r.deletedAt ? 'Activo' : 'Eliminado'
+                    __estado_registro: !(r.deletedAt || r.deleted_at) ? 'Activo' : 'Eliminado'
                 }));
             } catch (err) {
                 console.error(err);
@@ -162,39 +163,66 @@
     });
 
     const handleNew = () => {
-        goto(`/admin/configs/${selectedCatalog}/new`);
+        editingRecordId = null;
+        currentView = 'form';
     };
 
     const handleEdit = (row: any) => {
-        goto(`/admin/configs/${selectedCatalog}/${row.id}`);
+        editingRecordId = row.id;
+        currentView = 'form';
+    };
+
+    const handleFormSave = () => {
+        currentView = 'list';
+        refreshTrigger++;
+    };
+
+    const handleFormCancel = () => {
+        currentView = 'list';
     };
 
     const handleStatusChange = async (row: any, action: 'delete' | 'restore') => {
         if (action === 'restore') {
-            if (!confirm('¿Estás seguro de restaurar este registro?')) {
-                return;
-            }
+            const isConfirmed = await confirm({
+                title: 'Restaurar registro',
+                message: '¿Estás seguro de restaurar este registro?',
+                confirmText: 'Sí, restaurar',
+                cancelText: 'Cancelar',
+                type: 'warning'
+            });
+
+            if (!isConfirmed) return;
+
             try {
-                await api.patch(`/catalogs/${selectedCatalog}/${row.id}/restore`);
+                await api.patch(`/catalogs/${configState.selectedCatalog}/${row.id}/restore`);
                 row.deletedAt = null;
                 row.__estado_registro = 'Activo';
                 tableData = [...tableData];
-            } catch (e) {
+            } catch (e: any) {
                 console.error(e);
-                alert('Error al restaurar');
+                const apiMsg = e.response?.data?.message || e.message || 'Error al restaurar';
+                alertMsg(apiMsg, 'danger', 'Error');
             }
         } else if (action === 'delete') {
-            if (!confirm('¿Estás seguro de eliminar este registro?')) {
-                return;
-            }
+            const isConfirmed = await confirm({
+                title: 'Eliminar registro',
+                message: '¿Estás seguro de eliminar este registro?',
+                confirmText: 'Sí, eliminar',
+                cancelText: 'Cancelar',
+                type: 'danger'
+            });
+
+            if (!isConfirmed) return;
+
             try {
-                await api.delete(`/catalogs/${selectedCatalog}/${row.id}`);
+                await api.delete(`/catalogs/${configState.selectedCatalog}/${row.id}`);
                 row.deletedAt = new Date().toISOString();
                 row.__estado_registro = 'Eliminado';
                 tableData = [...tableData];
-            } catch (e) {
+            } catch (e: any) {
                 console.error(e);
-                alert('Error al eliminar');
+                const apiMsg = e.response?.data?.message || e.message || 'Error al eliminar';
+                alertMsg(apiMsg, 'danger', 'Error');
             }
         }
     };
@@ -203,38 +231,57 @@
 <PermissionGuard permission="UI:VIEW:CONFIGS">
     <div class="catalogs-page">
         <Section>
-            <SectionTitle title="Gestión de Catálogos" subtitle="Selecciona un catálogo para gestionar sus registros.">
+            <SectionTitle 
+                title={currentView === 'list' ? "Gestión de Catálogos" : (editingRecordId ? "Editar Registro" : "Añadir Registro")} 
+                subtitle={currentView === 'list' ? "Selecciona un catálogo para gestionar sus registros." : ""}
+                onBack={currentView === 'form' ? handleFormCancel : undefined}
+            >
                 {#snippet action()}
                     <div class="header-actions">
-                        <div class="catalog-selector">
-                            {#if loadingCatalogs}
-                                <Select options={[]} placeholder="Cargando catálogos..." disabled />
-                            {:else}
-                                <Select 
-                                    options={catalogsList} 
-                                    value={selectedCatalog} 
-                                    placeholder="Selecciona un catálogo" 
-                                    onchange={handleCatalogChange}
-                                />
-                            {/if}
-                        </div>
-                        <PermissionGuard permission="UI:CREATE:CONFIGS">
-                            {#if selectedCatalog}
-                                <Button variant="primary" onclick={handleNew} disabled={loadingCatalogs}>
-                                    <Plus size={18} />
-                                    Añadir Registro
-                                </Button>
-                            {/if}
-                        </PermissionGuard>
+                        {#if currentView === 'list'}
+                            <div class="catalog-selector">
+                                {#if loadingCatalogs}
+                                    <Select options={[]} placeholder="Cargando catálogos..." disabled />
+                                {:else}
+                                    <Select 
+                                        options={catalogsList} 
+                                        value={configState.selectedCatalog} 
+                                        placeholder="Selecciona un catálogo" 
+                                        onchange={handleCatalogChange}
+                                    />
+                                {/if}
+                            </div>
+                            <PermissionGuard permission="UI:CREATE:CONFIGS">
+                                {#if configState.selectedCatalog}
+                                    <Button variant="primary" onclick={handleNew} disabled={loadingCatalogs}>
+                                        <Plus size={18} />
+                                        Añadir Registro
+                                    </Button>
+                                {/if}
+                            </PermissionGuard>
+                        {/if}
                     </div>
                 {/snippet}
             </SectionTitle>
 
-            <div class="table-section-content">
-                {#if loadingMetadata || loadingData || loadingCatalogs}
+            <div class="table-section-content view-slider-container">
+                {#if currentView === 'form' && configState.selectedCatalog}
+                    <div class="slide-view" in:fly={{ x: 50, duration: 300 }} out:fly={{ x: 50, duration: 300 }}>
+                        <CatalogForm 
+                            catalogName={configState.selectedCatalog} 
+                            recordId={editingRecordId} 
+                            onsave={handleFormSave} 
+                            oncancel={handleFormCancel} 
+                        />
+                    </div>
+                {:else}
+                    <div class="slide-view" in:fly={{ x: -50, duration: 300 }} out:fly={{ x: -50, duration: 300 }}>
+                        {#if loadingCatalogs}
+                    <div class="loading-state">Cargando catálogos...</div>
+                {:else if !configState.selectedCatalog}
+                    <div class="loading-state">Selecciona un catálogo para visualizar o gestionar sus registros.</div>
+                {:else if loadingMetadata || loadingData}
                     <div class="loading-state">Cargando catálogo...</div>
-                {:else if !selectedCatalog}
-                    <div class="loading-state">No hay catálogos disponibles para tu rol.</div>
                 {:else}
                     <Table 
                         columns={columns()} 
@@ -257,6 +304,8 @@
                         {/snippet}
                     </Table>
                 {/if}
+                    </div>
+                {/if}
             </div>
         </Section>
     </div>
@@ -278,7 +327,17 @@
     }
 
     .table-section-content {
-        margin-top: 16px;
+        margin-top: 0;
+    }
+
+    .view-slider-container {
+        display: grid;
+        overflow-x: hidden;
+    }
+
+    .slide-view {
+        grid-area: 1 / 1;
+        width: 100%;
     }
 
     .loading-state {

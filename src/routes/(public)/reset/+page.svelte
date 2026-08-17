@@ -81,7 +81,7 @@
                 type="text" 
                 format="document"
                 bind:value={username} 
-                placeholder="Ej: 12345678ab" 
+                placeholder="Ej: 12345678" 
                 required 
             />
 

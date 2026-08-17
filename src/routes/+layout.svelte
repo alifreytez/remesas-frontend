@@ -2,6 +2,7 @@
     import '../app.css';
     import { onMount } from 'svelte';
     import { PUBLIC_APP_NAME } from '$env/static/public';
+    import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 
     let loaded = $state(false);
     
@@ -23,3 +24,5 @@
 </svelte:head>
 
 {@render children()}
+
+<ConfirmModal />

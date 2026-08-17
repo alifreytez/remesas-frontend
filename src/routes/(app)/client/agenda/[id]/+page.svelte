@@ -9,7 +9,7 @@
     import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
     import { Save, AlertCircle, ShieldCheck, Info, Plus, Trash2, CreditCard, Smartphone } from 'lucide-svelte';
     import { setHeader } from '$lib/stores/header.svelte';
-    import { countriesMethods, methodsConfig } from '$lib/data/methodsConfig';
+    import { methodsConfig } from '$lib/data/methodsConfig';
 
     let contactId = $derived(page.params.id);
     let isNew = $derived(contactId === 'new');
@@ -47,11 +47,7 @@
 
     let showAddBankForm = $state(false);
 
-    let availableMethods = $derived(
-        formData.country && countriesMethods[formData.country]
-            ? countriesMethods[formData.country]
-            : []
-    );
+    let availableMethods = Object.keys(methodsConfig);
 
     let currentMethodConfig = $derived(
         newBankDetail.method && methodsConfig[newBankDetail.method]
@@ -260,7 +256,7 @@
                             {/if}
                         {:else}
                             <div class="no-methods-alert">
-                                <p>Seleccione un país de residencia primero, o no hay métodos disponibles para el país seleccionado.</p>
+                                <p>No hay métodos disponibles actualmente.</p>
                             </div>
                         {/if}
                         

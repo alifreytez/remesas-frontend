@@ -1,11 +1,13 @@
 <script lang="ts">
     import { page } from '$app/state';
     import { auth } from '$lib/stores/auth.svelte';
+    import { USER_TYPES } from '$lib/constants/auth';
     import { goto } from '$app/navigation';
-    import { LayoutDashboard, Users, FileText, Settings, LogOut, Send, History, Contact } from 'lucide-svelte';
+    import { LayoutDashboard, Users, FileText, Settings, LogOut, Send, History, Contact, Shield } from 'lucide-svelte';
+
 
     let currentPath = $derived(page.url.pathname);
-    let isAdmin = $derived(auth.user?.type === 'ADMIN');
+    let isAdmin = $derived(auth.user?.userType === USER_TYPES.ADMIN);
 
     let adminMenu = $derived.by(() => {
         const menu = [
@@ -19,6 +21,10 @@
         
         if (auth.hasPermission('UI:VIEW:USERS')) {
             menu.push({ path: '/admin/users', label: 'Usuarios', icon: Users });
+        }
+        
+        if (auth.hasPermission('UI:VIEW:ROLES')) {
+            menu.push({ path: '/admin/roles', label: 'Roles y Permisos', icon: Shield });
         }
         
         if (auth.hasPermission('UI:VIEW:CONFIGS')) {

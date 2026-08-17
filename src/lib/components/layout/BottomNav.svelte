@@ -1,10 +1,11 @@
 <script lang="ts">
     import { page } from '$app/state';
     import { auth } from '$lib/stores/auth.svelte';
+    import { USER_TYPES } from '$lib/constants/auth';
     import { Home, List, User, Plus, FileText } from 'lucide-svelte';
 
     let currentPath = $derived(page.url.pathname);
-    let role = $derived(auth.user?.role || 'CLIENT');
+    let userType = $derived(auth.user?.userType || USER_TYPES.CLIENT);
 
     const adminNav = [
         { path: '/admin/home', label: 'Inicio', icon: Home },
@@ -19,7 +20,7 @@
         { path: '/users/me/profile', label: 'Perfil', icon: User }
     ];
 
-    let activeNav = $derived(role === 'ADMIN' ? adminNav : clientNav);
+    let activeNav = $derived(userType === USER_TYPES.ADMIN ? adminNav : clientNav);
 </script>
 
 <div class="bottom-nav-container">

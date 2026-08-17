@@ -2,7 +2,7 @@
     import type { Snippet } from 'svelte';
 
     let {
-        variant = 'primary', // 'primary' | 'outline' | 'icon'
+        variant = 'primary', // 'primary' | 'secondary' | 'danger' | 'ghost' | 'icon'
         type = 'button',
         onclick,
         disabled = false,
@@ -11,7 +11,7 @@
         class: className = '',
         style = ''
     }: {
-        variant?: 'primary' | 'outline' | 'icon';
+        variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'icon';
         type?: 'button' | 'submit' | 'reset';
         onclick?: (event: MouseEvent) => void;
         disabled?: boolean;
@@ -24,7 +24,12 @@
 
 <button
     {type}
-    class="btn-pill {variant === 'outline' ? 'btn-pill-outline' : ''} {variant === 'icon' ? 'btn-icon' : ''} {fullWidth ? 'btn-full-width' : ''} {className}"
+    class="btn-pill {className}"
+    class:btn-primary={variant === 'primary'}
+    class:btn-secondary={variant === 'secondary'}
+    class:btn-danger={variant === 'danger'}
+    class:btn-ghost={variant === 'ghost'}
+    class:btn-full-width={fullWidth}
     {style}
     {onclick}
     {disabled}
@@ -36,26 +41,25 @@
     button {
         font-family: inherit;
         cursor: pointer;
-        transition: opacity 0.2s, transform 0.1s;
+        /* Transición integral para todas las propiedades visuales y un clic rápido */
+        transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease, transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     button:active:not(:disabled) {
-        transform: scale(0.98);
+        transform: scale(0.96);
     }
 
     button:disabled {
-        opacity: 0.6;
+        opacity: 0.5;
         cursor: not-allowed;
         pointer-events: none;
     }
 
-    /* Botón Primario Píldora */
+    /* Base Estructural (se aplica a todos excepto icon que lo sobrescribe) */
     .btn-pill {
-        background-color: var(--bg-inverted);
-        color: white;
-        border: 1.5px solid transparent;
         border-radius: 9999px;
-        padding: 12px 24px;
+        padding: 0 24px;
+        height: 46px;
         font-size: 16px;
         font-weight: 500;
         width: fit-content;
@@ -64,13 +68,46 @@
         align-items: center;
         gap: 8px;
         line-height: 1;
+        box-sizing: border-box;
+        border: 1.5px solid transparent;
     }
 
-    /* Botón Secundario Outline */
-    .btn-pill-outline {
+    /* Variantes */
+    .btn-primary {
+        background-color: var(--bg-inverted, #111827);
+        color: white;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+        opacity: 0.85;
+    }
+
+    .btn-secondary {
         background-color: transparent;
         color: var(--text-main);
-        border: 1.5px solid var(--text-main);
+        border-color: var(--text-main);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background-color: var(--bg-secondary, #f3f4f6);
+    }
+
+    .btn-danger {
+        background-color: var(--danger-600, #dc2626);
+        color: white;
+    }
+    
+    .btn-danger:hover:not(:disabled) {
+        background-color: var(--danger-700, #b91c1c);
+    }
+
+    .btn-ghost {
+        background-color: transparent;
+        color: var(--text-main);
+    }
+
+    .btn-ghost:hover:not(:disabled) {
+        background-color: var(--bg-secondary, #f3f4f6);
     }
 
     /* Ancho Completo (Adaptable) */

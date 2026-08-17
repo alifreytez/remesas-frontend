@@ -50,8 +50,8 @@ class AuthStore {
                 }
             });
             
-            this.roles = (response.data.roles || []).map((r: any) => typeof r === 'string' ? r.toUpperCase() : (r.name || '').toUpperCase());
-            this.permissions = (response.data.permissions || []).map((p: any) => typeof p === 'string' ? p.toUpperCase() : (p.name || '').toUpperCase());
+            this.roles = (response.data.roles || []).map((r: any) => typeof r === 'string' ? r.toUpperCase() : (r.code || r.name || '').toUpperCase());
+            this.permissions = (response.data.permissions || []).map((p: any) => typeof p === 'string' ? p.toUpperCase() : (p.code || p.name || '').toUpperCase());
         } catch (error) {
             console.error('Error fetching permissions', error);
         }
@@ -83,28 +83,55 @@ class AuthStore {
         await this.fetchPermissions();
     }
 
-    async doRefresh() {
-        if (!this.refreshToken) throw new Error('No refresh token available');
-        const response = await api.post<{ data: { user: UserData, tokens?: { accessToken: string, refreshToken: string } } }>('/auth/refresh', {
-            refreshToken: this.refreshToken
-        });
+    private refreshPromise: Promise<string> | null = null;
 
-        const accessToken = response.data.tokens?.accessToken;
-        const newRefreshTk = response.data.tokens?.refreshToken;
-
-        if (accessToken) {
-            this.token = accessToken;
-            if (newRefreshTk) this.refreshToken = newRefreshTk;
-            
-            if (browser) {
-                localStorage.setItem('auth_token', this.token);
-                if (this.refreshToken) {
-                    localStorage.setItem('auth_refresh_token', this.refreshToken);
-                }
-            }
-            return accessToken;
+    async doRefresh(): Promise<string> {
+        if (!this.refreshToken) {
+            console.error('[AuthStore] No refresh token available in state');
+            throw new Error('No refresh token available');
         }
-        throw new Error('Failed to refresh token');
+
+        if (this.refreshPromise) {
+            console.log('[AuthStore] Returning cached refresh promise');
+            return this.refreshPromise;
+        }
+
+        console.log('[AuthStore] Starting token refresh request');
+        this.refreshPromise = (async () => {
+            try {
+                const response = await api.post<{ data: { user: UserData, tokens?: { accessToken: string, refreshToken: string } } }>('/auth/refresh', {
+                    refreshToken: this.refreshToken
+                });
+
+                console.log('[AuthStore] Refresh response successful');
+                const accessToken = response.data?.tokens?.accessToken;
+                const newRefreshTk = response.data?.tokens?.refreshToken;
+
+                if (accessToken) {
+                    this.token = accessToken;
+                    if (newRefreshTk) this.refreshToken = newRefreshTk;
+                    
+                    if (browser) {
+                        localStorage.setItem('auth_token', this.token);
+                        if (this.refreshToken) {
+                            localStorage.setItem('auth_refresh_token', this.refreshToken);
+                        }
+                    }
+                    console.log('[AuthStore] Token refreshed successfully');
+                    return accessToken;
+                }
+                
+                console.error('[AuthStore] API returned success but accessToken is missing in payload', response.data);
+                throw new Error('Failed to refresh token: missing accessToken in payload');
+            } catch (err) {
+                console.error('[AuthStore] Error during api.post(/auth/refresh):', err);
+                throw err;
+            } finally {
+                this.refreshPromise = null;
+            }
+        })();
+
+        return this.refreshPromise;
     }
 
     logout() {
@@ -121,6 +148,7 @@ class AuthStore {
     }
 
     hasPermission(permission: string): boolean {
+        if (this.hasRole('SUPERADMIN')) return true;
         return this.permissions.includes(permission.toUpperCase());
     }
 

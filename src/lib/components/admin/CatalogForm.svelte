@@ -1,58 +1,86 @@
 <script lang="ts">
-    import { page } from '$app/state';
-    import { setHeader } from '$lib/stores/header.svelte';
     import { api } from '$lib/utils/api';
-    import { goto } from '$app/navigation';
     import Section from '$lib/components/layout/Section.svelte';
-    import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
     import Grid from '$lib/components/ui/Grid.svelte';
     import Input from '$lib/components/ui/Input.svelte';
     import Switch from '$lib/components/ui/Switch.svelte';
     import Button from '$lib/components/ui/Button.svelte';
-    import Stack from '$lib/components/ui/Stack.svelte';
+    import Select from '$lib/components/ui/Select.svelte';
     import JsonTableEditor from '$lib/components/ui/JsonTableEditor.svelte';
+    import { confirm, alertMsg } from '$lib/stores/confirm.svelte';
     
-    let catalogName = $derived(page.params.catalogName);
+    let { 
+        catalogName, 
+        recordId = null, 
+        onsave, 
+        oncancel 
+    }: { 
+        catalogName: string; 
+        recordId?: string | null; 
+        onsave: () => void; 
+        oncancel: () => void; 
+    } = $props();
     
     let metadata = $state<Record<string, any>>({});
     let loading = $state(true);
     let saving = $state(false);
     
-    // El objeto que guardará el estado del nuevo registro
+    // El objeto que guardará el estado del registro
     let formData = $state<Record<string, any>>({});
+    
+    // Opciones para campos foráneos
+    let relationOptions = $state<Record<string, {value: string, label: string}[]>>({});
 
     $effect(() => {
-        if (catalogName) {
-            setHeader('Configuración', true, `/admin/configs/${catalogName}`, null);
-        } else {
-            setHeader('Configuración', true, '/admin/configs', null);
-        }
-        return () => { setHeader('', false, '', null); };
-    });
-
-    $effect(() => {
-        const fetchMetadata = async () => {
+        const fetchData = async () => {
             try {
-                const res = await api.get<any>(`/catalogs/${catalogName}/metadata`);
-                metadata = res?.data?.data || res?.data || res || {};
+                loading = true;
+                // Fetch Metadata
+                const metaRes = await api.get<any>(`/catalogs/${catalogName}/metadata`);
+                metadata = metaRes?.data?.data || metaRes?.data || metaRes || {};
+                
+                let recordData: any = {};
+                
+                if (recordId) {
+                    // Fetch Current Record si es edición
+                    const recordRes = await api.get<any>(`/catalogs/${catalogName}/${recordId}`);
+                    recordData = recordRes?.data?.data || recordRes?.data || recordRes || {};
+                }
                 
                 // Initialize form values
                 const initial: Record<string, any> = {};
                 Object.entries(metadata).forEach(([key, meta]: [string, any]) => {
                     if (meta.editable !== false) {
-                        initial[key] = meta.type === 'boolean' ? false : '';
+                        initial[key] = recordData[key] !== undefined ? String(recordData[key]) : (meta.type === 'boolean' ? false : '');
                     }
                 });
                 formData = initial;
                 
-            } catch (err) {
+                // Fetch relation options
+                const fieldsWithRelations = Object.entries(metadata).filter(([_, meta]: [string, any]) => meta.relatedCatalog && meta.editable !== false);
+                for (const [key, meta] of fieldsWithRelations) {
+                    try {
+                        const relRes = await api.get<any>(`/catalogs/${meta.relatedCatalog}?limit=100`);
+                        const relData = relRes?.data?.rows || relRes?.data?.data || relRes?.data || [];
+                        relationOptions[key] = relData.map((row: any) => ({
+                            value: String(row.id),
+                            label: String(row[meta.displayField || 'name'] || row.id)
+                        }));
+                    } catch (e) {
+                        console.error(`Error loading relation for ${key}`, e);
+                    }
+                }
+                
+            } catch (err: any) {
                 console.error(err);
-                alert('No se pudo cargar el formulario');
+                const apiMsg = err.response?.data?.message || err.message || 'No se pudo cargar el formulario o el registro';
+                alertMsg(apiMsg, 'danger', 'Error');
+                oncancel();
             } finally {
                 loading = false;
             }
         };
-        fetchMetadata();
+        fetchData();
     });
 
     // Obtener campos editables ordenados para el formulario
@@ -66,13 +94,29 @@
 
     const handleSubmit = async (e: Event) => {
         e.preventDefault();
+
+        const isConfirmed = await confirm({
+            title: recordId ? 'Guardar cambios' : 'Crear registro',
+            message: recordId ? '¿Estás seguro de que deseas guardar los cambios realizados en este registro?' : '¿Estás seguro de que deseas guardar este nuevo registro?',
+            confirmText: recordId ? 'Guardar' : 'Crear',
+            cancelText: 'Cancelar',
+            type: 'info'
+        });
+
+        if (!isConfirmed) return;
+
         try {
             saving = true;
-            await api.post(`/catalogs/${catalogName}`, formData);
-            goto('/admin/configs');
-        } catch (error) {
+            if (recordId) {
+                await api.patch(`/catalogs/${catalogName}/${recordId}`, formData);
+            } else {
+                await api.post(`/catalogs/${catalogName}`, formData);
+            }
+            onsave();
+        } catch (error: any) {
             console.error(error);
-            alert('Error guardando registro. Asegúrese de completar todos los campos requeridos correctamente.');
+            const apiMsg = error.response?.data?.message || error.message || 'Error guardando registro. Asegúrese de completar todos los campos requeridos correctamente.';
+            alertMsg(apiMsg, 'danger', 'Error al Guardar');
         } finally {
             saving = false;
         }
@@ -85,10 +129,8 @@
     {:else}
         <div class="layout-grid">
             <div class="form-column">
-                <Section>
-                    <SectionTitle title="Detalles del Nuevo Registro" />
-                    <form onsubmit={handleSubmit} class="catalog-form">
-                        <Grid cols={2} gap="24px">
+                <form onsubmit={handleSubmit} class="catalog-form">
+                    <Grid cols={2} gap="24px">
                             {#each formFields() as field}
                                 <div class="form-group {field.inputType === 'json-table' ? 'full-width' : ''}">
                                     {#if field.type === 'boolean'}
@@ -101,6 +143,14 @@
                                             <span class="label" style="display:block; margin-bottom:8px; font-size:14px; font-weight:500;">{field.uiLabel || field.key}</span>
                                             <JsonTableEditor bind:value={formData[field.key]} />
                                         </div>
+                                    {:else if field.relatedCatalog}
+                                        <Select 
+                                            label={field.uiLabel || field.key}
+                                            options={relationOptions[field.key] || []}
+                                            bind:value={formData[field.key]}
+                                            placeholder={field.placeholder || `Seleccionar ${field.uiLabel || field.key}`}
+                                            required={field.isRequired}
+                                        />
                                     {:else}
                                         <Input 
                                             id={field.key}
@@ -114,22 +164,24 @@
                                 </div>
                             {/each}
                         </Grid>
-                        
                         <div class="form-actions">
                             <Button type="submit" variant="primary" disabled={saving}>
-                                {saving ? 'Guardando...' : 'Guardar Registro'}
+                                {saving ? 'Guardando...' : (recordId ? 'Guardar Cambios' : 'Guardar Registro')}
                             </Button>
                         </div>
                     </form>
-                </Section>
             </div>
             
             <div class="info-column">
                 <Section>
-                    <SectionTitle title="Consejos" />
-                    <div class="info-content">
-                        <p>Complete todos los campos requeridos para continuar.</p>
-                        <p>Asegúrese de verificar la información antes de guardar para evitar errores en el sistema.</p>
+                    <div class="info-content" style="padding-top: 0;">
+                        <h3 style="margin-top: 0; font-size: 16px; font-weight: 600; color: var(--gray-800);">Consejos</h3>
+                        {#if recordId}
+                            <p>Solo modifique los campos necesarios. Tenga cuidado al cambiar datos críticos.</p>
+                        {:else}
+                            <p>Complete todos los campos requeridos para continuar.</p>
+                        {/if}
+                        <p>Asegúrese de verificar la información antes de guardar para evitar errores en el sistema o dependencias de otras tablas.</p>
                         <p>Si tiene dudas sobre algún campo, consulte con el administrador del sistema.</p>
                     </div>
                 </Section>
@@ -142,6 +194,12 @@
     .form-page {
         padding: 0;
         width: 100%;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 
     .layout-grid {

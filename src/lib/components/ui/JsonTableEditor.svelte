@@ -25,9 +25,10 @@
     let internalValue = $state<any>(null);
     let parsedString = $state(false);
     let initialized = $state(false);
+    let prevValue = $state<any>(undefined);
 
     $effect(() => {
-        if (!initialized) {
+        if (value !== prevValue) {
             if (value !== undefined && value !== null) {
                 if (typeof value === 'string') {
                     try {
@@ -39,10 +40,12 @@
                 } else {
                     // Si ya es un objeto/arreglo, copiamos para evitar mutaciones directas extrañas
                     internalValue = Array.isArray(value) ? [...value] : { ...value };
+                    parsedString = false;
                 }
             } else {
                 internalValue = [];
             }
+            prevValue = value;
             initialized = true;
         }
     });
@@ -50,10 +53,10 @@
     // Sincronizar internalValue -> value
     $effect(() => {
         if (initialized && isRoot) {
-            if (parsedString) {
-                value = JSON.stringify(internalValue);
-            } else {
-                value = internalValue;
+            const newVal = parsedString ? JSON.stringify(internalValue) : internalValue;
+            if (value !== newVal) {
+                value = newVal;
+                prevValue = newVal;
             }
         }
     });

@@ -5,6 +5,7 @@
  */
 import { auth } from '../stores/auth.svelte';
 import { PUBLIC_API_URL } from '$env/static/public';
+import { HTTP_STATUS } from '../constants/http';
 
 const API_BASE_URL = PUBLIC_API_URL;
 
@@ -66,7 +67,7 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
         const response = await fetch(url, config);
         
         // Manejar respuesta 204 No Content
-        if (response.status === 204) {
+        if (response.status === HTTP_STATUS.NO_CONTENT) {
             return null as unknown as T;
         }
 
@@ -74,29 +75,35 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
 
         if (!response.ok) {
             // Manejo global de expiración de sesión (Unauthorized)
-            if (response.status === 401) {
+            if (response.status === HTTP_STATUS.UNAUTHORIZED) {
                 if (endpoint !== '/auth/refresh' && !window.location.pathname.startsWith('/forgot')) {
                     if (auth.refreshToken) {
                         try {
                             const newToken = await auth.doRefresh();
+                            if (!newToken) throw new Error('El refresh token fue revocado o falló silenciosamente');
+                            
                             // Reintentar la petición original con el nuevo token
                             headers.set('Authorization', `Bearer ${newToken}`);
                             const retryResponse = await fetch(url, { ...config, headers });
                             
-                            if (retryResponse.status === 204) return null as unknown as T;
+                            if (retryResponse.status === HTTP_STATUS.NO_CONTENT) return null as unknown as T;
                             const retryData = await retryResponse.json();
                             if (!retryResponse.ok) throw new ApiError(retryResponse.status, retryData.message || 'Error en reintento', retryData);
                             return retryData as T;
                         } catch (refreshErr) {
+                            console.error('[API] Error during refresh retry:', refreshErr);
                             // Si falla el refresh, cerramos sesión definitivamente
                             auth.logout();
-                            if (window.location.pathname !== '/login') window.location.href = '/login';
-                            throw new ApiError(401, 'Sesión expirada. Por favor, inicia sesión nuevamente.', refreshErr);
+                            if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                                window.location.href = '/login';
+                            }
+                            throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'Sesión expirada. Por favor, inicia sesión nuevamente.', refreshErr);
                         }
                     } else {
+                        console.warn('[API] No refresh token available, redirecting to login');
                         // Si no hay refresh token, cerramos sesión directo
                         auth.logout();
-                        if (window.location.pathname !== '/login') {
+                        if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
                             window.location.href = '/login';
                         }
                     }

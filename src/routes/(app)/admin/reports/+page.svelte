@@ -19,12 +19,14 @@
     let fechaInicio = $state('');
     let fechaFin = $state('');
     
+    import { alertMsg } from '$lib/stores/confirm.svelte';
+
     function handleDownload() {
         if (!tipoReporte || !fechaInicio || !fechaFin) {
-            alert('Por favor complete todos los campos');
+            alertMsg('Por favor complete todos los campos', 'warning');
             return;
         }
-        alert('Generando reporte: ' + tipoReporte + ' desde ' + fechaInicio + ' hasta ' + fechaFin);
+        alertMsg('Generando reporte: ' + tipoReporte + ' desde ' + fechaInicio + ' hasta ' + fechaFin, 'info', 'Descarga');
     }
 </script>
 

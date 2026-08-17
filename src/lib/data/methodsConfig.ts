@@ -1,9 +1,4 @@
-export const countriesMethods: Record<string, string[]> = {
-    '1': ['pago_movil', 'transferencia'], // Venezuela
-    '2': ['transferencia', 'nequi'], // Colombia
-    '3': ['transferencia'], // Peru
-    '4': ['transferencia']  // Chile
-};
+
 
 export const methodsConfig: Record<string, any> = {
     'pago_movil': {

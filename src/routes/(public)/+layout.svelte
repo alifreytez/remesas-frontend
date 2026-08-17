@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { auth } from '$lib/stores/auth.svelte';
+    import { USER_TYPES } from '$lib/constants/auth';
     import { goto } from '$app/navigation';
 
     let { children } = $props();
@@ -10,7 +11,7 @@
         mounted = true;
         // Si el usuario entra a una ruta pública (ej. /login) estando ya logueado, redirigir
         if (auth.isAuthenticated) {
-            goto(auth.user?.role === 'ADMIN' ? '/admin/home' : '/client/home');
+            goto(auth.user?.userType === USER_TYPES.ADMIN ? '/admin/home' : '/client/home');
         }
     });
 </script>
