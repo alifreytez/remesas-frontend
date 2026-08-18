@@ -38,21 +38,46 @@
         if (!disabled) {
             open = !open;
             if (open) {
-                // Calcular espacio disponible
+                // Reset states
+                dropUp = false;
+                alignRight = false;
+                searchQuery = '';
+                
+                // Wait for the DOM to render the dropdown menu
+                await tick();
+                
                 if (dropdownRef) {
-                    const rect = dropdownRef.getBoundingClientRect();
-                    const spaceBelow = window.innerHeight - rect.bottom;
-                    const spaceAbove = rect.top;
-                    const spaceRight = window.innerWidth - rect.left;
-                    
-                    // Si el espacio abajo es menor a 300px (aprox dropdown) y hay más espacio arriba
-                    dropUp = spaceBelow < 300 && spaceAbove > spaceBelow;
-                    
-                    // Si no hay suficiente espacio a la derecha para 250px, alinear a la derecha
-                    alignRight = spaceRight < 250;
+                    const menu = dropdownRef.querySelector('.dropdown-menu') as HTMLDivElement;
+                    if (menu) {
+                        const rect = dropdownRef.getBoundingClientRect();
+                        const menuRect = menu.getBoundingClientRect();
+                        
+                        const spaceBelow = window.innerHeight - rect.bottom;
+                        const spaceAbove = rect.top;
+                        
+                        // Evaluar si se va a desbordar verticalmente
+                        // Si el menú es más grande que el espacio de abajo Y hay más espacio arriba
+                        if (menuRect.height > spaceBelow && spaceAbove > spaceBelow) {
+                            dropUp = true;
+                        }
+                        
+                        // Evaluar si se va a desbordar horizontalmente por la derecha
+                        // 20px de margen de seguridad
+                        const viewportWidth = document.documentElement.clientWidth;
+                        if (rect.left + menuRect.width > viewportWidth - 20) {
+                            alignRight = true;
+                        }
+                        
+                        // Si después de alinear a la derecha, se desborda por la izquierda
+                        if (alignRight && (rect.right - menuRect.width < 20)) {
+                            // En un caso extremo donde no cabe en ninguno de los dos lados, 
+                            // lo dejamos alineado a la izquierda (comportamiento por defecto) o 
+                            // podríamos forzar un max-width, pero el CSS ya tiene max-width.
+                            alignRight = false;
+                        }
+                    }
                 }
 
-                searchQuery = '';
                 await tick();
                 const selectedEl = dropdownRef?.querySelector('.option.selected');
                 if (selectedEl) {
@@ -229,9 +254,7 @@
         position: absolute;
         top: calc(100% + 8px);
         left: 0;
-        min-width: 100%;
-        width: max-content;
-        max-width: 250px;
+        width: 100%;
         background-color: var(--bg-primary);
         border: 1px solid var(--border-color);
         border-radius: 12px;
@@ -241,7 +264,7 @@
         display: flex;
         flex-direction: column;
         animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-        transform-origin: top left;
+        transform-origin: top center;
     }
 
     .dropdown-menu.align-right {
@@ -317,12 +340,16 @@
         justify-content: space-between;
         align-items: center;
         overflow: hidden;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .option:last-child {
+        border-bottom: none;
     }
 
     .option span {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        white-space: normal;
+        word-break: break-word;
         flex: 1;
         min-width: 0;
         margin-right: 8px;
