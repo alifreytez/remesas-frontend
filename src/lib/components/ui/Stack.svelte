@@ -16,5 +16,7 @@
         flex-direction: column;
         gap: var(--stack-gap);
         width: 100%;
+        min-width: 0;
+        max-width: 100%;
     }
 </style>

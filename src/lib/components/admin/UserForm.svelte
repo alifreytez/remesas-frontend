@@ -7,7 +7,9 @@
     import Grid from '$lib/components/ui/Grid.svelte';
     import Stack from '$lib/components/ui/Stack.svelte';
     import SectionAccordion from '$lib/components/ui/SectionAccordion.svelte';
+    import DataGrid from '$lib/components/ui/DataGrid.svelte';
     import { Save, X } from 'lucide-svelte';
+    import { untrack } from 'svelte';
 
     let { recordId = null, onSuccess, onCancel } = $props<{
         recordId?: string | number | null;
@@ -29,7 +31,7 @@
     let password = $state('');
     
     // Arrays for multiple selection
-    let selectedRoles = $state<number[]>([]);
+    let selectedRoleId = $state<string | number | null>('');
     let selectedPermissions = $state<number[]>([]);
 
     // Catalogs
@@ -47,12 +49,12 @@
 
             // Load catalogs
             const [rolesRes, permsRes] = await Promise.all([
-                api.get<any>('/roles?limit=100'),
-                api.get<any>('/permissions?limit=500')
+                api.get<any>('/roles?limit=500'),
+                api.get<any>('/permissions?limit=1000&include=true')
             ]);
 
-            availableRoles = rolesRes?.data?.rows || [];
-            availablePermissions = permsRes?.data?.rows || [];
+            availableRoles = rolesRes?.data?.rows || rolesRes?.data || rolesRes?.rows || [];
+            availablePermissions = permsRes?.data?.rows || permsRes?.data || permsRes?.rows || [];
 
             // If editing, load user
             if (recordId) {
@@ -70,8 +72,9 @@
                         phone = user._Person.phone || '';
                     }
 
-                    if (user._Roles) {
-                        selectedRoles = user._Roles.map((r: any) => r.id || r.roleId || r.role);
+                    if (user._Roles && user._Roles.length > 0) {
+                        const firstRole = user._Roles[0];
+                        selectedRoleId = firstRole.id || firstRole.roleId || firstRole.role;
                     }
 
                     if (user._Permissions) {
@@ -82,7 +85,7 @@
                 // Reset form for creation
                 firstName = ''; lastName = ''; documentNumber = ''; phone = '';
                 username = ''; email = ''; password = '';
-                selectedRoles = []; selectedPermissions = [];
+                selectedRoleId = ''; selectedPermissions = [];
             }
 
         } catch (err: any) {
@@ -92,13 +95,7 @@
         }
     }
 
-    function toggleRole(id: number, checked: boolean) {
-        if (checked) {
-            if (!selectedRoles.includes(id)) selectedRoles = [...selectedRoles, id];
-        } else {
-            selectedRoles = selectedRoles.filter(r => r !== id);
-        }
-    }
+
 
     function togglePermission(id: number, checked: boolean) {
         if (checked) {
@@ -128,7 +125,7 @@
                     email,
                     ...(password ? { password } : {})
                 },
-                roles: selectedRoles,
+                roles: selectedRoleId ? [selectedRoleId] : [],
                 permissions: selectedPermissions
             };
 
@@ -145,6 +142,42 @@
             saving = false;
         }
     }
+
+    // --- Configuración Matriz de Permisos ---
+    let permissionMatrixCols = $derived.by(() => {
+        const actionSet = new Set<string>();
+        availablePermissions.forEach(p => {
+            const actionCode = p._Actions?.code;
+            if (actionCode) actionSet.add(actionCode);
+        });
+        
+        const cols = [{ key: '_resource_name', label: 'Recurso' }];
+        Array.from(actionSet).sort().forEach(action => {
+            cols.push({ key: action, label: action, align: 'center' as const });
+        });
+        return cols;
+    });
+
+    let permissionMatrixData = $derived.by(() => {
+        const resourceMap = new Map<string, any>();
+        
+        availablePermissions.forEach(p => {
+            const resourceCode = p._Resources?.code || 'GENERAL';
+            const resourceDesc = p._Resources?.description || resourceCode;
+            const actionCode = p._Actions?.code;
+            
+            if (!resourceMap.has(resourceCode)) {
+                resourceMap.set(resourceCode, { _resource_name: resourceDesc, _perms: {} });
+            }
+            
+            if (actionCode) {
+                const row = resourceMap.get(resourceCode);
+                row._perms[actionCode] = p;
+            }
+        });
+        
+        return Array.from(resourceMap.values());
+    });
 </script>
 
 <div class="user-form">
@@ -165,54 +198,49 @@
                 </Grid>
             </SectionAccordion>
 
-            <SectionAccordion title="Datos de la Cuenta" open={true}>
+            <SectionAccordion title="Datos de la Cuenta y Seguridad" open={true}>
                 <Grid cols={2} gap="var(--spacing-4)">
                     <Input label="Usuario" bind:value={username} required placeholder="Ej: jperez" />
-                    <Input 
-                        label="Contraseña" 
-                        bind:value={password} 
-                        type="password" 
-                        required={!recordId} 
-                        placeholder={recordId ? 'Dejar en blanco para no cambiar' : '........'} 
+                    <Select 
+                        label="Rol del Usuario" 
+                        options={availableRoles.map(r => ({ value: r.id, label: r.name || r.code }))}
+                        bind:value={selectedRoleId}
                     />
                 </Grid>
                 <div style="margin-top: var(--spacing-4);">
-                    <Input label="Correo Electrónico" bind:value={email} type="email" placeholder="ejemplo@correo.com" required />
+                    <Grid cols={2} gap="var(--spacing-4)">
+                        <Input 
+                            label="Contraseña" 
+                            bind:value={password} 
+                            type="password" 
+                            required={!recordId} 
+                            placeholder={recordId ? 'Dejar en blanco para no cambiar' : '........'} 
+                        />
+                        <Input label="Correo Electrónico" bind:value={email} type="email" placeholder="ejemplo@correo.com" required />
+                    </Grid>
                 </div>
             </SectionAccordion>
 
-            <SectionAccordion title="Asignación de Roles" open={false}>
-                <div class="roles-grid">
-                    {#each availableRoles as role}
-                        <div class="switch-item">
-                            <Switch 
-                                checked={selectedRoles.includes(role.id)} 
-                                onchange={(checked) => toggleRole(role.id, checked)}
-                            />
-                            <div class="switch-info">
-                                <span class="item-name">{role.name}</span>
-                                <span class="item-code">{role.code}</span>
-                            </div>
-                        </div>
-                    {/each}
-                </div>
-            </SectionAccordion>
-
-            <SectionAccordion title="Permisos Granulares Adicionales" open={false}>
-                <div class="permissions-grid">
-                    {#each availablePermissions as perm}
-                        <div class="switch-item">
-                            <Switch 
-                                checked={selectedPermissions.includes(perm.id)} 
-                                onchange={(checked) => togglePermission(perm.id, checked)}
-                            />
-                            <div class="switch-info">
-                                <span class="item-name">{perm.name}</span>
-                                <span class="item-code">{perm.code}</span>
-                            </div>
-                        </div>
-                    {/each}
-                </div>
+            <SectionAccordion title="Permisos Granulares Adicionales" open={true}>
+                <p class="section-desc">Asigna permisos específicos a este usuario más allá de su rol (opcional).</p>
+                <DataGrid columns={permissionMatrixCols} data={permissionMatrixData}>
+                    {#snippet cell(row, colKey)}
+                        {#if colKey === '_resource_name'}
+                            <strong>{row._resource_name}</strong>
+                        {:else}
+                            {#if row._perms[colKey]}
+                                <div class="center-switch">
+                                    <Switch 
+                                        checked={selectedPermissions.includes(row._perms[colKey].id)} 
+                                        onchange={(checked) => togglePermission(row._perms[colKey].id, checked)}
+                                    />
+                                </div>
+                            {:else}
+                                <span class="no-perm">-</span>
+                            {/if}
+                        {/if}
+                    {/snippet}
+                </DataGrid>
             </SectionAccordion>
 
             <div class="form-actions">
@@ -244,36 +272,20 @@
         border: 1px solid #fecaca;
     }
 
-    .roles-grid, .permissions-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-        gap: var(--spacing-4);
-        background: var(--neutral-50);
-        padding: var(--spacing-4);
-        border-radius: var(--radius-lg);
-        border: 1px solid var(--neutral-200);
-    }
-
-    .switch-item {
-        display: flex;
-        align-items: center;
-        gap: var(--spacing-3);
-    }
-
-    .switch-info {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .item-name {
+    .section-desc {
         font-size: var(--text-sm);
-        font-weight: 500;
-        color: var(--neutral-900);
+        color: var(--gray-500);
+        margin-bottom: var(--spacing-4);
     }
 
-    .item-code {
-        font-size: 12px;
-        color: var(--neutral-500);
+    .center-switch {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .no-perm {
+        color: var(--gray-300);
     }
 
     .form-actions {

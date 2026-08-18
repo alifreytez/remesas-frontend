@@ -8,6 +8,7 @@
     import Select from '$lib/components/ui/Select.svelte';
     import JsonTableEditor from '$lib/components/ui/JsonTableEditor.svelte';
     import { confirm, alertMsg } from '$lib/stores/confirm.svelte';
+    import { untrack } from 'svelte';
     
     let { 
         catalogName, 
@@ -32,12 +33,13 @@
     let relationOptions = $state<Record<string, {value: string, label: string}[]>>({});
 
     $effect(() => {
-        const fetchData = async () => {
-            try {
-                loading = true;
-                // Fetch Metadata
-                const metaRes = await api.get<any>(`/catalogs/${catalogName}/metadata`);
-                metadata = metaRes?.data?.data || metaRes?.data || metaRes || {};
+        untrack(() => {
+            const fetchData = async () => {
+                try {
+                    loading = true;
+                    // Fetch Metadata
+                    const metaRes = await api.get<any>(`/catalogs/${catalogName}/metadata`);
+                    metadata = metaRes?.data?.data || metaRes?.data || metaRes || {};
                 
                 let recordData: any = {};
                 
@@ -81,6 +83,7 @@
             }
         };
         fetchData();
+        });
     });
 
     // Obtener campos editables ordenados para el formulario

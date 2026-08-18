@@ -36,6 +36,7 @@
         flex-direction: column;
         gap: var(--spacing-4);
         width: 100%;
+        min-width: 0;
     }
 
     .accordion-header {
@@ -56,6 +57,7 @@
         color: var(--gray-900);
         margin: 0;
         white-space: nowrap;
+        flex-shrink: 0;
     }
 
     .line {
@@ -70,6 +72,7 @@
         align-items: center;
         justify-content: center;
         transition: transform 0.2s ease;
+        flex-shrink: 0;
     }
 
     .icon.open {
@@ -81,5 +84,6 @@
         flex-direction: column;
         gap: var(--spacing-4);
         width: 100%;
+        min-width: 0;
     }
 </style>

@@ -48,6 +48,7 @@
 <style>
     .data-grid-container {
         width: 100%;
+        max-width: 100%;
         max-height: 450px;
         overflow-x: auto;
         overflow-y: auto;

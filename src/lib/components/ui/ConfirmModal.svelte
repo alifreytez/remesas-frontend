@@ -53,14 +53,14 @@
             
             <div class="modal-actions">
                 {#if !options.hideCancel}
-                    <Button variant="outline" onclick={handleCancel} class="w-full">
+                    <Button variant="secondary" onclick={handleCancel} fullWidth={true}>
                         {options.cancelText || 'Cancelar'}
                     </Button>
                 {/if}
                 <Button 
                     variant="primary" 
                     onclick={handleConfirm}
-                    class="w-full"
+                    fullWidth={true}
                 >
                     {options.confirmText || 'Confirmar'}
                 </Button>

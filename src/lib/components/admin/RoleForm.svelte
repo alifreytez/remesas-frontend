@@ -7,13 +7,14 @@
     import Stack from '$lib/components/ui/Stack.svelte';
     import SectionAccordion from '$lib/components/ui/SectionAccordion.svelte';
     import DataGrid from '$lib/components/ui/DataGrid.svelte';
+    import { untrack } from 'svelte';
 
     let { recordId = null, onSuccess } = $props<{
         recordId?: string | number | null;
         onSuccess: () => void;
     }>();
 
-    let loading = $state(false);
+    let loading = $state(true);
     let saving = $state(false);
     let error = $state<string | null>(null);
 
@@ -34,7 +35,9 @@
     let availablePermissions = $state<any[]>([]);
 
     $effect(() => {
-        loadData();
+        untrack(() => {
+            loadData();
+        });
     });
 
     async function loadData() {
@@ -270,6 +273,8 @@
 <style>
     .role-form {
         width: 100%;
+        max-width: 100%;
+        min-width: 0;
     }
 
     .loading-state {
