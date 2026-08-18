@@ -329,7 +329,7 @@
             <Pagination 
                 bind:currentPage={currentPage} 
                 bind:itemsPerPage={itemsPerPage}
-                totalItems={data.length} 
+                totalItems={filteredData().length} 
                 hasBorder={false}
             />
         </div>
