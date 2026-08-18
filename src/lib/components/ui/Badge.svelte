@@ -11,7 +11,10 @@
 
 <style>
     .badge {
-        display: inline-block;
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        min-width: 85px; /* Ensures ACTIVO and INACTIVO have the same size */
         padding: 4px 8px;
         border-radius: 6px;
         font-size: 11px;

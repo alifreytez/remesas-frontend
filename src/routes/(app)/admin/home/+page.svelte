@@ -25,7 +25,7 @@
         { key: 'cliente', label: 'Cliente' },
         { key: 'corredor', label: 'Corredor' },
         { key: 'monto', label: 'Monto' },
-        { key: 'estado', label: 'Estado', format: 'badge' as const }
+        { key: 'estado', label: 'Estado', format: 'badge' as const, width: '1%' }
     ];
 </script>
 

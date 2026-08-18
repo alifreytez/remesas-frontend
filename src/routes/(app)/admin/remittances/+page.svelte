@@ -24,7 +24,7 @@
             { label: 'Chile', value: 'Chile' },
             { label: 'Perú', value: 'Perú' }
         ] },
-        { key: 'estado', label: 'Estado', format: 'badge' as const, filterType: 'select' as const, filterOptions: [
+        { key: 'estado', label: 'Estado', format: 'badge' as const, width: '1%', filterType: 'select' as const, filterOptions: [
             { label: 'Todos', value: '' },
             { label: 'PENDING', value: 'PENDING' },
             { label: 'APPROVED', value: 'APPROVED' },
