@@ -11,6 +11,7 @@
     import { UserPlus, Edit2, Trash2 } from 'lucide-svelte';
     import { fly } from 'svelte/transition';
     import UserForm from '$lib/components/admin/UserForm.svelte';
+    import { confirm, alertMsg } from '$lib/stores/confirm.svelte';
     
     let users = $state<any[]>([]);
     let loading = $state(true);
@@ -56,12 +57,19 @@
     }
 
     async function handleDelete(userId: string | number) {
-        if (confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
+        const confirmed = await confirm({
+            title: 'Eliminar Usuario',
+            message: '¿Estás seguro de que deseas eliminar este usuario?',
+            type: 'danger',
+            confirmText: 'Sí, eliminar'
+        });
+        if (confirmed) {
             try {
                 await api.delete(`/users/${userId}`);
                 await fetchUsers();
+                alertMsg('Usuario eliminado exitosamente', 'success');
             } catch (err: any) {
-                alert(err.message || 'Error al eliminar usuario');
+                alertMsg(err.message || 'Error al eliminar usuario', 'danger');
             }
         }
     }
@@ -72,7 +80,7 @@
         { key: 'email', label: 'Correo', filterType: 'text' as const },
         { key: 'document_number', label: 'Cédula', filterType: 'text' as const },
         { key: 'roles', label: 'Roles', filterType: 'text' as const },
-        { key: 'status', label: 'Estado', format: 'badge' as const, badgeMap: { 'Activo': 'success', 'Inactivo': 'danger' } }
+        { key: 'status', label: 'Estado', format: 'badge' as const, badgeMap: { 'Activo': 'success', 'Inactivo': 'danger' }, width: '1%' }
     ];
 
     // Formatear los datos para la tabla
@@ -131,16 +139,18 @@
                             >
                                 {#snippet actions(row)}
                                     <div class="actions-group">
-                                        <PermissionGuard permission="UI:UPDATE:USERS">
-                                            <button class="action-icon-btn edit" title="Editar" onclick={() => openForm(row.id)}>
-                                                <Edit2 size={16} />
-                                            </button>
-                                        </PermissionGuard>
-                                        <PermissionGuard permission="UI:DELETE:USERS">
-                                            <button class="action-icon-btn delete" title="Eliminar" onclick={() => handleDelete(row.id)}>
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </PermissionGuard>
+                                        {#if row.status === 'Activo'}
+                                            <PermissionGuard permission="UI:UPDATE:USERS">
+                                                <button class="action-icon-btn edit" title="Editar" onclick={() => openForm(row.id)}>
+                                                    <Edit2 size={16} />
+                                                </button>
+                                            </PermissionGuard>
+                                            <PermissionGuard permission="UI:DELETE:USERS">
+                                                <button class="action-icon-btn delete" title="Eliminar" onclick={() => handleDelete(row.id)}>
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </PermissionGuard>
+                                        {/if}
                                     </div>
                                 {/snippet}
                             </Table>
@@ -159,12 +169,13 @@
 
     .view-slider-container {
         display: grid;
-        overflow-x: hidden;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .slide-view {
         grid-area: 1 / 1;
         width: 100%;
+        min-width: 0;
     }
 
     .loading-state, .error-state {
@@ -181,6 +192,7 @@
         display: flex;
         gap: var(--spacing-2);
         justify-content: center;
+        width: 100%;
     }
 
     .action-icon-btn {

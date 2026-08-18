@@ -10,6 +10,7 @@
     import { ShieldPlus, Edit2, Trash2 } from 'lucide-svelte';
     import { fly } from 'svelte/transition';
     import RoleForm from '$lib/components/admin/RoleForm.svelte';
+    import { confirm, alertMsg } from '$lib/stores/confirm.svelte';
     
     let roles = $state<any[]>([]);
     let loading = $state(true);
@@ -55,12 +56,19 @@
     }
 
     async function handleDelete(roleId: string | number) {
-        if (confirm('¿Estás seguro de que deseas eliminar este rol? Esta acción puede afectar a todos los usuarios que lo tengan asignado.')) {
+        const confirmed = await confirm({
+            title: 'Eliminar Rol',
+            message: '¿Estás seguro de que deseas eliminar este rol? Esta acción puede afectar a todos los usuarios que lo tengan asignado.',
+            type: 'danger',
+            confirmText: 'Sí, eliminar'
+        });
+        if (confirmed) {
             try {
                 await api.delete(`/roles/${roleId}`);
                 await fetchRoles();
+                alertMsg('Rol eliminado exitosamente', 'success');
             } catch (err: any) {
-                alert(err.message || 'Error al eliminar rol');
+                alertMsg(err.message || 'Error al eliminar rol', 'danger');
             }
         }
     }
@@ -70,7 +78,7 @@
         { key: 'code', label: 'Código', filterType: 'text' as const },
         { key: 'description', label: 'Descripción', filterType: 'text' as const },
         { key: 'parent_roles', label: 'Hereda de', filterType: 'text' as const },
-        { key: 'status', label: 'Estado', format: 'badge' as const, badgeMap: { 'Activo': 'success', 'Inactivo': 'danger' } }
+        { key: 'status', label: 'Estado', format: 'badge' as const, badgeMap: { 'Activo': 'success', 'Inactivo': 'danger' }, width: '1%' }
     ];
 
     // Formatear los datos para la tabla
@@ -127,16 +135,18 @@
                             >
                                 {#snippet actions(row)}
                                     <div class="actions-group">
-                                        <PermissionGuard permission="UI:UPDATE:ROLES">
-                                            <button class="action-icon-btn edit" title="Editar" onclick={() => openForm(row.id)}>
-                                                <Edit2 size={16} />
-                                            </button>
-                                        </PermissionGuard>
-                                        <PermissionGuard permission="UI:DELETE:ROLES">
-                                            <button class="action-icon-btn delete" title="Eliminar" onclick={() => handleDelete(row.id)}>
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </PermissionGuard>
+                                        {#if row.status === 'Activo'}
+                                            <PermissionGuard permission="UI:UPDATE:ROLES">
+                                                <button class="action-icon-btn edit" title="Editar" onclick={() => openForm(row.id)}>
+                                                    <Edit2 size={16} />
+                                                </button>
+                                            </PermissionGuard>
+                                            <PermissionGuard permission="UI:DELETE:ROLES">
+                                                <button class="action-icon-btn delete" title="Eliminar" onclick={() => handleDelete(row.id)}>
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </PermissionGuard>
+                                        {/if}
                                     </div>
                                 {/snippet}
                             </Table>
@@ -177,6 +187,7 @@
         display: flex;
         gap: var(--spacing-2);
         justify-content: center;
+        width: 100%;
     }
 
     .action-icon-btn {

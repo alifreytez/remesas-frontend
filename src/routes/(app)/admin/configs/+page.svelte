@@ -32,7 +32,10 @@
     
     $effect(() => {
         setHeader('Configuración', false, '', null);
-        return () => { setHeader('', false, '', null); };
+        return () => { 
+            setHeader('', false, '', null); 
+            configState.selectedCatalog = '';
+        };
     });
 
     // Handle catalog selection change
@@ -292,14 +295,14 @@
                     >
                         {#snippet actions(row)}
                             <div class="actions-group">
-                                <PermissionGuard permission="UI:UPDATE:CONFIGS">
-                                    <button class="action-btn edit" onclick={() => handleEdit(row)} title="Editar"><Edit2 size={16} /></button>
-                                    {#if row.__estado_registro === 'Activo'}
-                                        <button class="action-btn delete" onclick={() => handleStatusChange(row, 'delete')} title="Eliminar"><Trash2 size={16} /></button>
-                                    {:else}
-                                        <button class="action-btn restore" onclick={() => handleStatusChange(row, 'restore')} title="Restaurar"><RotateCcw size={16} /></button>
-                                    {/if}
-                                </PermissionGuard>
+                                  <PermissionGuard permission="UI:UPDATE:CONFIGS">
+                                      {#if row.__estado_registro === 'Activo'}
+                                          <button class="action-btn edit" onclick={() => handleEdit(row)} title="Editar"><Edit2 size={16} /></button>
+                                          <button class="action-btn delete" onclick={() => handleStatusChange(row, 'delete')} title="Eliminar"><Trash2 size={16} /></button>
+                                      {:else}
+                                          <button class="action-btn restore" onclick={() => handleStatusChange(row, 'restore')} title="Restaurar"><RotateCcw size={16} /></button>
+                                      {/if}
+                                  </PermissionGuard>
                             </div>
                         {/snippet}
                     </Table>
@@ -332,12 +335,13 @@
 
     .view-slider-container {
         display: grid;
-        overflow-x: hidden;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .slide-view {
         grid-area: 1 / 1;
         width: 100%;
+        min-width: 0;
     }
 
     .loading-state {
@@ -350,7 +354,9 @@
     .actions-group {
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 8px;
+        width: 100%;
     }
 
     .action-btn {
