@@ -78,18 +78,10 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
             if (response.status === HTTP_STATUS.UNAUTHORIZED) {
                 if (endpoint !== '/auth/refresh' && !window.location.pathname.startsWith('/forgot')) {
                     if (auth.refreshToken) {
+                        let newToken: string | null = null;
                         try {
-                            const newToken = await auth.doRefresh();
+                            newToken = await auth.doRefresh();
                             if (!newToken) throw new Error('El refresh token fue revocado o falló silenciosamente');
-                            
-                            // Reintentar la petición original con el nuevo token
-                            headers.set('Authorization', `Bearer ${newToken}`);
-                            const retryResponse = await fetch(url, { ...config, headers });
-                            
-                            if (retryResponse.status === HTTP_STATUS.NO_CONTENT) return null as unknown as T;
-                            const retryData = await retryResponse.json();
-                            if (!retryResponse.ok) throw new ApiError(retryResponse.status, retryData.message || 'Error en reintento', retryData);
-                            return retryData as T;
                         } catch (refreshErr) {
                             console.error('[API] Error during refresh retry:', refreshErr);
                             // Si falla el refresh, cerramos sesión definitivamente
@@ -99,6 +91,15 @@ async function request<T>(endpoint: string, options: FetchOptions = {}): Promise
                             }
                             throw new ApiError(HTTP_STATUS.UNAUTHORIZED, 'Sesión expirada. Por favor, inicia sesión nuevamente.', refreshErr);
                         }
+                        
+                        // Reintentar la petición original con el nuevo token (FUERA DEL TRY CATCH)
+                        headers.set('Authorization', `Bearer ${newToken}`);
+                        const retryResponse = await fetch(url, { ...config, headers });
+                        
+                        if (retryResponse.status === HTTP_STATUS.NO_CONTENT) return null as unknown as T;
+                        const retryData = await retryResponse.json();
+                        if (!retryResponse.ok) throw new ApiError(retryResponse.status, retryData.message || 'Error en reintento', retryData);
+                        return retryData as T;
                     } else {
                         console.warn('[API] No refresh token available, redirecting to login');
                         // Si no hay refresh token, cerramos sesión directo
