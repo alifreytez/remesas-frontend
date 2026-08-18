@@ -34,6 +34,8 @@
         options.find(opt => opt.value === value)?.label || placeholder
     );
 
+    let menuRef: HTMLDivElement | undefined = $state();
+
     async function toggle() {
         if (!disabled) {
             open = !open;
@@ -43,45 +45,14 @@
                 alignRight = false;
                 searchQuery = '';
                 
-                // Wait for the DOM to render the dropdown menu
+                // Wait for the portal to render
                 await tick();
                 
-                if (dropdownRef) {
-                    const menu = dropdownRef.querySelector('.dropdown-menu') as HTMLDivElement;
-                    if (menu) {
-                        const rect = dropdownRef.getBoundingClientRect();
-                        const menuRect = menu.getBoundingClientRect();
-                        
-                        const spaceBelow = window.innerHeight - rect.bottom;
-                        const spaceAbove = rect.top;
-                        
-                        // Evaluar si se va a desbordar verticalmente
-                        // Si el menú es más grande que el espacio de abajo Y hay más espacio arriba
-                        if (menuRect.height > spaceBelow && spaceAbove > spaceBelow) {
-                            dropUp = true;
-                        }
-                        
-                        // Evaluar si se va a desbordar horizontalmente por la derecha
-                        // 20px de margen de seguridad
-                        const viewportWidth = document.documentElement.clientWidth;
-                        if (rect.left + menuRect.width > viewportWidth - 20) {
-                            alignRight = true;
-                        }
-                        
-                        // Si después de alinear a la derecha, se desborda por la izquierda
-                        if (alignRight && (rect.right - menuRect.width < 20)) {
-                            // En un caso extremo donde no cabe en ninguno de los dos lados, 
-                            // lo dejamos alineado a la izquierda (comportamiento por defecto) o 
-                            // podríamos forzar un max-width, pero el CSS ya tiene max-width.
-                            alignRight = false;
-                        }
+                if (menuRef) {
+                    const selectedEl = menuRef.querySelector('.option.selected');
+                    if (selectedEl) {
+                        selectedEl.scrollIntoView({ block: 'nearest' });
                     }
-                }
-
-                await tick();
-                const selectedEl = dropdownRef?.querySelector('.option.selected');
-                if (selectedEl) {
-                    selectedEl.scrollIntoView({ block: 'nearest' });
                 }
             }
         }
@@ -94,9 +65,69 @@
     }
 
     function handleClickOutside(event: MouseEvent) {
-        if (dropdownRef && !dropdownRef.contains(event.target as Node)) {
+        const isClickInsideTrigger = dropdownRef && dropdownRef.contains(event.target as Node);
+        const isClickInsideMenu = menuRef && menuRef.contains(event.target as Node);
+        
+        if (!isClickInsideTrigger && !isClickInsideMenu) {
             open = false;
         }
+    }
+
+    function portal(node: HTMLElement) {
+        if (typeof document === 'undefined') return {};
+        
+        document.body.appendChild(node);
+        node.style.position = 'fixed';
+        node.style.zIndex = '9999';
+
+        function updatePosition() {
+            if (!dropdownRef) return;
+            const rect = dropdownRef.getBoundingClientRect();
+            
+            node.style.width = `${rect.width}px`;
+            node.style.top = `${rect.bottom + 8}px`;
+            node.style.bottom = 'auto';
+            node.style.left = `${rect.left}px`;
+            node.style.right = 'auto';
+            dropUp = false;
+            alignRight = false;
+            
+            const menuRect = node.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            const viewportWidth = document.documentElement.clientWidth;
+            
+            if (menuRect.height > spaceBelow && spaceAbove > spaceBelow) {
+                dropUp = true;
+                node.style.top = 'auto';
+                node.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+            }
+            
+            if (rect.left + menuRect.width > viewportWidth - 20) {
+                alignRight = true;
+                node.style.left = 'auto';
+                node.style.right = `${window.innerWidth - rect.right}px`;
+            }
+        }
+        
+        tick().then(updatePosition);
+        
+        const scrollHandler = () => {
+            if (open) updatePosition();
+        };
+        
+        window.addEventListener('scroll', scrollHandler, true);
+        window.addEventListener('resize', scrollHandler);
+
+        return {
+            destroy() {
+                window.removeEventListener('scroll', scrollHandler, true);
+                window.removeEventListener('resize', scrollHandler);
+                if (node.parentNode) {
+                    node.parentNode.removeChild(node);
+                }
+            }
+        };
     }
 
     onMount(() => {
@@ -134,7 +165,7 @@
     </div>
 
     {#if open}
-        <div class="dropdown-menu {dropUp ? 'drop-up' : ''} {alignRight ? 'align-right' : ''}">
+        <div class="dropdown-menu {dropUp ? 'drop-up' : ''} {alignRight ? 'align-right' : ''}" bind:this={menuRef} use:portal>
             <div class="search-box">
                 <Search size={14} color="var(--text-muted)" class="search-icon" />
                 <input 
