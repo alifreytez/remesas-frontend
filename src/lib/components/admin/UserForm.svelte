@@ -165,7 +165,7 @@
             };
 
             if (recordId) {
-                await api.put(`/users/${recordId}`, payload);
+                await api.patch(`/users/${recordId}`, payload);
             } else {
                 await api.post(`/users`, payload);
             }
