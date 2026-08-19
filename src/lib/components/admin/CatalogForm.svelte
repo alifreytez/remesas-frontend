@@ -28,6 +28,7 @@
     
     // El objeto que guardará el estado del registro
     let formData = $state<Record<string, any>>({});
+    let currentRecordId = $state(recordId);
     
     // Opciones para campos foráneos
     let relationOptions = $state<Record<string, {value: string, label: string}[]>>({});
@@ -110,12 +111,13 @@
 
         try {
             saving = true;
-            if (recordId) {
-                await api.patch(`/catalogs/${catalogName}/${recordId}`, formData);
+            if (currentRecordId) {
+                await api.patch(`/catalogs/${catalogName}/${currentRecordId}`, formData);
             } else {
-                await api.post(`/catalogs/${catalogName}`, formData);
+                const res = await api.post(`/catalogs/${catalogName}`, formData);
+                currentRecordId = res.data?.id || res.data?.data?.id || currentRecordId;
             }
-            onsave();
+            alertMsg('Los datos del registro han sido guardados exitosamente.', 'success', 'Registro Actualizado');
         } catch (error: any) {
             console.error(error);
             const apiMsg = error.response?.data?.message || error.message || 'Error guardando registro. Asegúrese de completar todos los campos requeridos correctamente.';
@@ -169,7 +171,7 @@
                         </Grid>
                         <div class="form-actions">
                             <Button type="submit" variant="primary" disabled={saving}>
-                                {saving ? 'Guardando...' : (recordId ? 'Guardar Cambios' : 'Guardar Registro')}
+                                {saving ? 'Guardando...' : (currentRecordId ? 'Guardar Cambios' : 'Guardar Registro')}
                             </Button>
                         </div>
                     </form>

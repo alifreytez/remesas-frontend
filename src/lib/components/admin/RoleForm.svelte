@@ -8,11 +8,14 @@
     import SectionAccordion from '$lib/components/ui/SectionAccordion.svelte';
     import DataGrid from '$lib/components/ui/DataGrid.svelte';
     import { untrack } from 'svelte';
+    import { alertMsg } from '$lib/stores/confirm.svelte';
 
     let { recordId = null, onSuccess } = $props<{
         recordId?: string | number | null;
         onSuccess: () => void;
     }>();
+
+    let currentRoleId = $state(recordId);
 
     let loading = $state(true);
     let saving = $state(false);
@@ -53,8 +56,7 @@
 
             const allRoles = rolesRes?.data?.rows || rolesRes?.data || [];
             availablePermissions = permsRes?.data?.rows || permsRes?.data || [];
-            console.log('AVAILABLE PERMISSIONS', availablePermissions[0]);
-            availableRoles = recordId ? allRoles.filter((r: any) => r.id != recordId) : allRoles;
+                        availableRoles = recordId ? allRoles.filter((r: any) => r.id != recordId) : allRoles;
 
             // If editing, load role
             if (recordId) {
@@ -67,16 +69,16 @@
 
                     // Load Inheritances (Parent Roles)
                     if (role.parentRoles && Array.isArray(role.parentRoles)) {
-                        selectedInheritances = role.parentRoles.map((r: any) => r.id || r.roleId || r.role);
+                        selectedInheritances = role.parentRoles.map((r: any) => r.parentRole || r.role || r.id);
                     } else if (role._ParentRoles && Array.isArray(role._ParentRoles)) {
-                        selectedInheritances = role._ParentRoles.map((r: any) => r.id || r.roleId || r.role);
+                        selectedInheritances = role._ParentRoles.map((r: any) => r.parentRole || r.role || r.id);
                     }
                     
                     // Load Permissions
                     if (role.permissions && Array.isArray(role.permissions)) {
-                        selectedPermissions = role.permissions.map((p: any) => p.id || p.permissionId || p.permission);
+                        selectedPermissions = role.permissions.map((p: any) => p.permission || p.permissionId || p.id);
                     } else if (role._Permissions && Array.isArray(role._Permissions)) {
-                        selectedPermissions = role._Permissions.map((p: any) => p.id || p.permissionId || p.permission);
+                        selectedPermissions = role._Permissions.map((p: any) => p.permission || p.permissionId || p.id);
                     }
                 }
             } else {
@@ -110,6 +112,41 @@
         }
     }
 
+    let columnCheckState = $derived.by(() => {
+        const state: Record<string, boolean> = {};
+        permissionMatrixCols.forEach(col => {
+            if (col.key === '_resource_name') return;
+            let allIdsForAction: number[] = [];
+            availablePermissions.forEach(p => {
+                if (p._Actions?.code === col.key) {
+                    allIdsForAction.push(p.id);
+                }
+            });
+            if (allIdsForAction.length === 0) {
+                state[col.key] = false;
+            } else {
+                state[col.key] = allIdsForAction.every(id => selectedPermissions.includes(id));
+            }
+        });
+        return state;
+    });
+
+    function toggleAll(action: string, checked: boolean) {
+        let allIdsForAction: number[] = [];
+        availablePermissions.forEach(p => {
+            if (p._Actions?.code === action) {
+                allIdsForAction.push(p.id);
+            }
+        });
+        
+        if (checked) {
+            const newIds = allIdsForAction.filter(id => !selectedPermissions.includes(id));
+            selectedPermissions = [...selectedPermissions, ...newIds];
+        } else {
+            selectedPermissions = selectedPermissions.filter(id => !allIdsForAction.includes(id));
+        }
+    }
+
     async function save() {
         if (!code) {
             error = 'Por favor completa el campo obligatorio (Código).';
@@ -120,17 +157,19 @@
             saving = true;
             error = null;
 
+            const addedPermissions = selectedPermissions.filter(id => !originalPermissions.includes(id));
+            const removedPermissions = originalPermissions.filter(id => !selectedPermissions.includes(id));
+
             const addedInheritances = selectedInheritances.filter(id => !originalInheritances.includes(id));
             const removedInheritances = originalInheritances.filter(id => !selectedInheritances.includes(id));
-
-            let currentRoleId = recordId;
 
             const payload = {
                 body: {
                     code: code.toUpperCase(),
                     description
                 },
-                permisos: selectedPermissions
+                permissions: addedPermissions,
+                permissionsToRemove: removedPermissions
             };
 
             if (currentRoleId) {
@@ -151,7 +190,9 @@
                 }
             }
 
-            onSuccess();
+            originalPermissions = [...selectedPermissions];
+            originalInheritances = [...selectedInheritances];
+            alertMsg('Los datos del registro han sido guardados exitosamente.', 'success', 'Registro Actualizado');
         } catch (err: any) {
             error = err.response?.data?.message || err.message || 'Error al guardar el rol';
         } finally {
@@ -160,10 +201,29 @@
     }
 
     // --- Configuración DataGrid Herencias ---
-    const inheritanceCols = [
-        { key: 'description', label: 'Rol' },
-        { key: 'assign', label: 'Heredar', align: 'center' as const, width: '120px' }
-    ];
+    let inheritanceCols = $derived.by(() => {
+        const isAllChecked = availableRoles.length > 0 && availableRoles.every(r => selectedInheritances.includes(r.id));
+        return [
+            { key: 'description', label: 'Rol' },
+            { 
+                key: 'assign', 
+                label: 'Heredar', 
+                align: 'center' as const, 
+                width: '120px',
+                type: 'switch',
+                isAllChecked,
+                onToggleAll: (checked: boolean) => {
+                    if (checked) {
+                        const newIds = availableRoles.map(r => r.id).filter(id => !selectedInheritances.includes(id));
+                        selectedInheritances = [...selectedInheritances, ...newIds];
+                    } else {
+                        const roleIds = availableRoles.map(r => r.id);
+                        selectedInheritances = selectedInheritances.filter(id => !roleIds.includes(id));
+                    }
+                }
+            }
+        ];
+    });
 
     // --- Configuración Matriz de Permisos ---
     let permissionMatrixCols = $derived.by(() => {
@@ -173,9 +233,19 @@
             if (actionCode) actionSet.add(actionCode);
         });
         
-        const cols = [{ key: '_resource_name', label: 'Recurso' }];
+        const cols: any[] = [{ key: '_resource_name', label: 'Recurso' }];
         Array.from(actionSet).sort().forEach(action => {
-            cols.push({ key: action, label: action, align: 'center' as const });
+            const colPerms = permissionMatrixData.filter(row => row._perms && row._perms[action]).map(row => row._perms[action].id);
+            const isAllChecked = colPerms.length > 0 && colPerms.every(id => selectedPermissions.includes(id));
+            
+            cols.push({ 
+                key: action, 
+                label: action, 
+                align: 'center' as const,
+                type: 'switch',
+                isAllChecked,
+                onToggleAll: (checked: boolean) => toggleAll(action, checked)
+            });
         });
         return cols;
     });
@@ -218,7 +288,7 @@
                 </Grid>
             </SectionAccordion>
 
-            <SectionAccordion title="Herencia de Roles" open={true}>
+            <SectionAccordion title="Herencia de Roles" open={false}>
                 <p class="section-desc">Selecciona de qué otros roles heredará permisos automáticamente.</p>
                 <DataGrid columns={inheritanceCols} data={availableRoles}>
                     {#snippet cell(row, colKey)}
@@ -239,7 +309,7 @@
                 </DataGrid>
             </SectionAccordion>
 
-            <SectionAccordion title="Permisos Granulares Directos" open={true}>
+            <SectionAccordion title="Permisos Granulares Directos" open={false}>
                 <p class="section-desc">Matriz de permisos explícitos asignados directamente a este rol.</p>
                 <DataGrid columns={permissionMatrixCols} data={permissionMatrixData}>
                     {#snippet cell(row, colKey)}
@@ -263,7 +333,7 @@
 
             <div class="form-actions">
                 <Button variant="primary" onclick={save} disabled={saving}>
-                    {saving ? 'Guardando...' : (recordId ? 'Actualizar Rol' : 'Crear Rol')}
+                    {saving ? 'Guardando...' : (currentRoleId ? 'Actualizar Rol' : 'Crear Rol')}
                 </Button>
             </div>
         </Stack>

@@ -160,17 +160,20 @@
 
 <style>
     .roles-page {
+        width: 100%;
+        min-width: 0;
         padding: 0;
     }
 
     .view-slider-container {
         display: grid;
-        overflow-x: hidden;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .slide-view {
         grid-area: 1 / 1;
         width: 100%;
+        min-width: 0;
     }
 
     .loading-state, .error-state {

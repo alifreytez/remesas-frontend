@@ -27,7 +27,7 @@
         switch (format) {
             case 'name':
                 // Solo letras y espacios (incluye acentos)
-                val = val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+                val = val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');
                 break;
             case 'phone':
                 // Solo números, +, - (SIN espacios)
@@ -35,7 +35,7 @@
                 break;
             case 'document':
                   val = val.toUpperCase();
-                  if (val.startsWith('E') || val.startsWith('R')) {
+                  if (val.startsWith('E') || val.startsWith('V') || val.startsWith('J') || val.startsWith('G') || val.startsWith('R')) {
                       const prefix = val.charAt(0);
                       const rest = val.slice(1).replace(/[^0-9]/g, '');
                       val = prefix + rest;
@@ -43,6 +43,10 @@
                       val = val.replace(/[^0-9]/g, '');
                   }
                   break;
+            case 'username':
+                // Solo alfanuméricos y guiones bajos, sin espacios
+                val = val.replace(/[^a-zA-Z0-9_]/g, '');
+                break;
             case 'email':
                 // Eliminar espacios de forma explícita y luego filtrar caracteres de email
                 val = val.replace(/\s/g, '').replace(/[^a-zA-Z0-9@.\-_]/g, '');
@@ -59,6 +63,17 @@
         // Bloquear explícitamente la barra espaciadora en correo y teléfono
         if ((format === 'email' || format === 'phone') && e.key === ' ') {
             e.preventDefault();
+        }
+    }
+
+    function handleBlur(e: FocusEvent) {
+        if (typeof value === 'string') {
+            const trimmed = value.trim();
+            if (value !== trimmed) {
+                value = trimmed;
+                const input = e.target as HTMLInputElement;
+                if (input) input.value = trimmed;
+            }
         }
     }
 
@@ -94,6 +109,7 @@
             {value}
             oninput={handleInput} 
             onkeydown={handleKeydown}
+            onblur={handleBlur}
             {disabled} 
             {required} 
         />

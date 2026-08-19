@@ -78,7 +78,7 @@
                     }
 
                     if (user._Permissions) {
-                        selectedPermissions = user._Permissions.map((p: any) => p.id || p.permissionId || p.permission);
+                        selectedPermissions = user._Permissions.map((p: any) => p.permission || p.permissionId || p.id);
                     }
                 }
             } else {
@@ -102,6 +102,41 @@
             if (!selectedPermissions.includes(id)) selectedPermissions = [...selectedPermissions, id];
         } else {
             selectedPermissions = selectedPermissions.filter(p => p !== id);
+        }
+    }
+
+    let columnCheckState = $derived.by(() => {
+        const state: Record<string, boolean> = {};
+        permissionMatrixCols.forEach(col => {
+            if (col.key === '_resource_name') return;
+            let allIdsForAction: number[] = [];
+            availablePermissions.forEach(p => {
+                if (p._Actions?.code === col.key) {
+                    allIdsForAction.push(p.id);
+                }
+            });
+            if (allIdsForAction.length === 0) {
+                state[col.key] = false;
+            } else {
+                state[col.key] = allIdsForAction.every(id => selectedPermissions.includes(id));
+            }
+        });
+        return state;
+    });
+
+    function toggleAll(action: string, checked: boolean) {
+        let allIdsForAction: number[] = [];
+        availablePermissions.forEach(p => {
+            if (p._Actions?.code === action) {
+                allIdsForAction.push(p.id);
+            }
+        });
+        
+        if (checked) {
+            const newIds = allIdsForAction.filter(id => !selectedPermissions.includes(id));
+            selectedPermissions = [...selectedPermissions, ...newIds];
+        } else {
+            selectedPermissions = selectedPermissions.filter(id => !allIdsForAction.includes(id));
         }
     }
 
@@ -151,9 +186,19 @@
             if (actionCode) actionSet.add(actionCode);
         });
         
-        const cols = [{ key: '_resource_name', label: 'Recurso' }];
+        const cols: any[] = [{ key: '_resource_name', label: 'Recurso' }];
         Array.from(actionSet).sort().forEach(action => {
-            cols.push({ key: action, label: action, align: 'center' as const });
+            const colPerms = permissionMatrixData.filter(row => row._perms && row._perms[action]).map(row => row._perms[action].id);
+            const isAllChecked = colPerms.length > 0 && colPerms.every(id => selectedPermissions.includes(id));
+            
+            cols.push({ 
+                key: action, 
+                label: action, 
+                align: 'center' as const,
+                type: 'switch',
+                isAllChecked,
+                onToggleAll: (checked: boolean) => toggleAll(action, checked)
+            });
         });
         return cols;
     });
@@ -191,16 +236,16 @@
 
             <SectionAccordion title="Datos de la Persona" open={true}>
                 <Grid cols={2} gap="var(--spacing-4)">
-                    <Input label="Nombres" bind:value={firstName} placeholder="Ej: Juan Pablo" required />
-                    <Input label="Apellidos" bind:value={lastName} placeholder="Ej: Pérez Gómez" required />
-                    <Input label="Nro. Documento" bind:value={documentNumber} placeholder="Ej: 12345678" required />
-                    <Input label="Teléfono" bind:value={phone} placeholder="Ej: +58 412 1234567" />
+                    <Input label="Nombres" bind:value={firstName} placeholder="Ej: Juan Pablo" required format="name" />
+                    <Input label="Apellidos" bind:value={lastName} placeholder="Ej: Pérez Gómez" required format="name" />
+                    <Input label="Nro. Documento" bind:value={documentNumber} placeholder="Ej: V12345678" required format="document" />
+                    <Input label="Teléfono" bind:value={phone} placeholder="Ej: +584121234567" format="phone" />
                 </Grid>
             </SectionAccordion>
 
             <SectionAccordion title="Datos de la Cuenta y Seguridad" open={true}>
                 <Grid cols={2} gap="var(--spacing-4)">
-                    <Input label="Usuario" bind:value={username} required placeholder="Ej: jperez" />
+                    <Input label="Usuario" bind:value={username} required placeholder="Ej: jperez" format="username" />
                     <Select 
                         label="Rol del Usuario" 
                         options={availableRoles.map(r => ({ value: r.id, label: r.name || r.code }))}
@@ -216,12 +261,12 @@
                             required={!recordId} 
                             placeholder={recordId ? 'Dejar en blanco para no cambiar' : '........'} 
                         />
-                        <Input label="Correo Electrónico" bind:value={email} type="email" placeholder="ejemplo@correo.com" required />
+                        <Input label="Correo Electrónico" bind:value={email} type="email" placeholder="ejemplo@correo.com" required format="email" />
                     </Grid>
                 </div>
             </SectionAccordion>
 
-            <SectionAccordion title="Permisos Granulares Adicionales" open={true}>
+            <SectionAccordion title="Permisos Granulares Adicionales" open={false}>
                 <p class="section-desc">Asigna permisos específicos a este usuario más allá de su rol (opcional).</p>
                 <DataGrid columns={permissionMatrixCols} data={permissionMatrixData}>
                     {#snippet cell(row, colKey)}

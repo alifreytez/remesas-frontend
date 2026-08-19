@@ -49,7 +49,7 @@
 
 <div class="remittances-container">
     <PermissionGuard permission="UI:VIEW:REMITTANCES">
-        <Section variant="default">
+        <Section>
             
 
 

@@ -19,5 +19,7 @@
         box-shadow: 0 1px 3px rgba(0,0,0,0.02);
         container-type: inline-size;
         container-name: section;
+        width: 100%;
+        min-width: 0;
     }
 </style>

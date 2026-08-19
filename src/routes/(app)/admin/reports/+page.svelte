@@ -32,7 +32,7 @@
 
 <div class="reports-container">
     <PermissionGuard permission="UI:VIEW:REPORTS">
-        <Section variant="outline">
+        <Section>
             
             <div class="export-box">
                 <h3 class="export-title">Exportar Reporte</h3>

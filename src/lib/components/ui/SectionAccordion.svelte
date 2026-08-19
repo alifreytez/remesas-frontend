@@ -3,12 +3,18 @@
 
     let {
         title = '',
-        open = $bindable(true),
+        open = true,
         children
     } = $props();
 
+    let isOpen = $state(open);
+
+    $effect(() => {
+        isOpen = open;
+    });
+
     function toggle() {
-        open = !open;
+        isOpen = !isOpen;
     }
 </script>
 
@@ -16,14 +22,14 @@
     <button type="button" class="accordion-header" onclick={toggle}>
         <h3 class="title">{title}</h3>
         <div class="line"></div>
-        <div class="icon" class:open>
+        <div class="icon" class:open={isOpen}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="m6 9 6 6 6-6"/>
             </svg>
         </div>
     </button>
 
-    {#if open}
+    {#if isOpen}
         <div class="accordion-content" transition:slide={{ duration: 200 }}>
             {@render children()}
         </div>

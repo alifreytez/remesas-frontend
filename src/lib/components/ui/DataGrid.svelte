@@ -1,10 +1,20 @@
 <script lang="ts">
     import type { Snippet } from 'svelte';
+    import Switch from './Switch.svelte';
 
-    let { columns, data, cell } = $props<{
-        columns: { key: string; label: string; align?: 'left' | 'center' | 'right'; width?: string }[];
+    let { columns, data, cell, headerCell } = $props<{
+        columns: { 
+            key: string; 
+            label: string; 
+            align?: 'left' | 'center' | 'right'; 
+            width?: string;
+            type?: 'switch';
+            isAllChecked?: boolean;
+            onToggleAll?: (checked: boolean) => void;
+        }[];
         data: any[];
-        cell?: Snippet<[any, string]>; // Recibe (row, colKey)
+        cell?: Snippet<[any, string]>;
+        headerCell?: Snippet<[any]>; // Recibe (row, colKey)
     }>();
 </script>
 
@@ -16,7 +26,19 @@
                     <th 
                         style="text-align: {col.align || 'left'}; {col.width ? `width: ${col.width};` : ''}"
                     >
-                        {col.label}
+                        {#if headerCell}
+                            {@render headerCell(col)}
+                        {:else if col.type === 'switch'}
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                <span>{col.label}</span>
+                                <Switch 
+                                    checked={col.isAllChecked} 
+                                    onchange={(checked) => col.onToggleAll && col.onToggleAll(checked)}
+                                />
+                            </div>
+                        {:else}
+                            {col.label}
+                        {/if}
                     </th>
                 {/each}
             </tr>

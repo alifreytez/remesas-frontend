@@ -542,6 +542,7 @@
     :global(.toolbar-btn) {
         padding: 6px 16px !important;
         font-size: 13px !important;
+        height: 34px !important;
     }
 
     .toolbar-actions {

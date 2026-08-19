@@ -1,6 +1,7 @@
 <script lang="ts">
     import { setHeader } from '$lib/stores/header.svelte';
     import Section from '$lib/components/layout/Section.svelte';
+    import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
     import Grid from '$lib/components/ui/Grid.svelte';
     import Stack from '$lib/components/ui/Stack.svelte';
     import Card from '$lib/components/ui/Card.svelte';
@@ -33,34 +34,36 @@
     <Stack gap="var(--spacing-8)">
         
         <PermissionGuard permission="UI:VIEW:DASHBOARD_STATS">
-            <Section title="Ingresos del Día por País de Origen" variant="outline">
+            <Section>
+                <SectionTitle title="Ingresos del Día por País de Origen" />
                 <Grid cols="1fr 1fr" gap="var(--spacing-6)">
                     <div class="stat-item border-left border-green">
                         <span class="stat-label">CHILE</span>
-                        <span class="stat-value">$450,000 CLP</span>
+                        <span class="stat-value">$1,240.50</span>
                     </div>
-                    <div class="stat-item border-left border-teal">
+                    <div class="stat-item border-left border-blue">
                         <span class="stat-label">PERÚ</span>
-                        <span class="stat-value">2,500 PEN</span>
+                        <span class="stat-value">$850.00</span>
                     </div>
                 </Grid>
             </Section>
 
-            <Section title="Tasas Vigentes" variant="outline">
+            <Section>
+                <SectionTitle title="Tasas Vigentes" />
                 <div class="inline-stats">
                     <div class="stat-group">
                         <span class="stat-label">VEN &lt;-&gt; CHI:</span>
-                        <span class="stat-value-sm">43.5</span>
+                        <span class="stat-value-sm">1.52 USD/CLP</span>
                     </div>
-                    <div class="stat-divider">|</div>
                     <div class="stat-group">
-                        <span class="stat-label">PER &lt;-&gt; CHI:</span>
-                        <span class="stat-value-sm">3.8</span>
+                        <span class="stat-label">VEN &lt;-&gt; PER:</span>
+                        <span class="stat-value-sm">3.75 USD/PEN</span>
                     </div>
                 </div>
             </Section>
 
-            <Section title="Comisiones (Por Corredor)" variant="outline">
+            <Section>
+                <SectionTitle title="Comisiones (Por Corredor)" />
                 <div class="stat-group">
                     <span class="stat-label">Chile -&gt; Perú:</span>
                     <span class="stat-value-sm">2.5% + $1</span>
@@ -69,11 +72,13 @@
         </PermissionGuard>
 
         <PermissionGuard permission="UI:VIEW:REMITTANCES">
-            <Section title="Últimas Remesas en Cola">
+            <Section>
+                <SectionTitle title="Últimas Remesas en Cola" />
                 <Table 
                     data={pendingRemittances} 
                     columns={tableColumns} 
-                    loading={false}
+                    variant="v2" 
+                    paginated={false} 
                 />
             </Section>
         </PermissionGuard>

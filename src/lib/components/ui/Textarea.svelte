@@ -12,7 +12,7 @@
     {#if label}
         <label>{label}</label>
     {/if}
-    <textarea {placeholder} bind:value {disabled} {rows}></textarea>
+    <textarea {placeholder} bind:value {disabled} {rows} onblur={() => { if (typeof value === 'string') value = value.trim() }}></textarea>
 </div>
 
 <style>

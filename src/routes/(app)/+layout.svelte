@@ -65,6 +65,8 @@
     }
 
     .page-content {
+        width: 100%;
+        min-width: 0;
         flex: 1;
         padding: 0 var(--spacing-6) var(--spacing-6) var(--spacing-6);
     }
@@ -75,6 +77,8 @@
         }
         
         .page-content {
+        width: 100%;
+        min-width: 0;
             padding: 0 var(--spacing-4) 76px var(--spacing-4); /* (60px menu area + 16px gap) */
         }
     }
