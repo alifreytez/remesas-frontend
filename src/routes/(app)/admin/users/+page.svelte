@@ -38,7 +38,7 @@
         try {
             loading = true;
             const response = await api.get<{ data: { rows: any[] } }>('/users');
-            users = response.data.rows || [];
+            users = response.data?.rows || response.data || [];
         } catch (err: any) {
             error = err.message || 'Error al cargar usuarios';
         } finally {
