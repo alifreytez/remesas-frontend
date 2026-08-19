@@ -10,6 +10,7 @@
     import DataGrid from '$lib/components/ui/DataGrid.svelte';
     import { Save, X } from 'lucide-svelte';
     import { untrack } from 'svelte';
+    import { alertMsg } from '$lib/stores/confirm.svelte';
 
     let { recordId = null, onSuccess, onCancel } = $props<{
         recordId?: string | number | null;
@@ -166,11 +167,12 @@
 
             if (recordId) {
                 await api.patch(`/users/${recordId}`, payload);
+                alertMsg('Usuario actualizado exitosamente', 'success');
             } else {
                 await api.post(`/users`, payload);
+                alertMsg('Usuario creado exitosamente', 'success');
+                onSuccess();
             }
-
-            onSuccess();
         } catch (err: any) {
             error = err.message || 'Error al guardar el usuario';
         } finally {
