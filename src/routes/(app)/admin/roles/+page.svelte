@@ -77,6 +77,7 @@
     const columns = [
         { key: 'code', label: 'Código', filterType: 'text' as const },
         { key: 'description', label: 'Descripción', filterType: 'text' as const },
+        { key: 'hierarchy', label: 'Jerarquía', filterType: 'number' as const, width: '120px', align: 'center' as const },
         { key: 'parent_roles', label: 'Hereda de', filterType: 'text' as const },
         { key: 'status', label: 'Estado', format: 'badge' as const, badgeMap: { 'Activo': 'success', 'Inactivo': 'danger' }, width: '1%' }
     ];
@@ -86,6 +87,7 @@
         id: r.id,
         code: r.code,
         description: r.description || 'Sin descripción',
+        hierarchy: r.hierarchy ?? 100,
         parent_roles: r.parentRoles && r.parentRoles.length > 0 ? r.parentRoles.map((pr: any) => pr.code || pr.name).join(', ') : 'Ninguno',
         status: (r.deletedAt || r.deleted_at) ? 'Inactivo' : 'Activo'
     })));

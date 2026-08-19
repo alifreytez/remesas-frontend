@@ -24,6 +24,7 @@
     // Form data
     let code = $state('');
     let description = $state('');
+    let hierarchy = $state(100);
     
     // Original State for dirty-checking
     let originalPermissions = $state<number[]>([]);
@@ -66,6 +67,7 @@
                 if (role) {
                     code = role.code || '';
                     description = role.description || '';
+                    hierarchy = role.hierarchy ?? 100;
 
                     // Load Inheritances (Parent Roles)
                     if (role.parentRoles && Array.isArray(role.parentRoles)) {
@@ -82,7 +84,7 @@
                     }
                 }
             } else {
-                code = ''; description = '';
+                code = ''; description = ''; hierarchy = 100;
                 selectedPermissions = []; selectedInheritances = [];
             }
 
@@ -166,7 +168,8 @@
             const payload = {
                 body: {
                     code: code.toUpperCase(),
-                    description
+                    description,
+                    hierarchy
                 },
                 permissions: addedPermissions,
                 permissionsToRemove: removedPermissions
@@ -202,7 +205,8 @@
 
     // --- Configuración DataGrid Herencias ---
     let inheritanceCols = $derived.by(() => {
-        const isAllChecked = availableRoles.length > 0 && availableRoles.every(r => selectedInheritances.includes(r.id));
+        const validRoles = availableRoles.filter(r => r.hierarchy >= hierarchy);
+        const isAllChecked = validRoles.length > 0 && validRoles.every(r => selectedInheritances.includes(r.id));
         return [
             { key: 'description', label: 'Rol' },
             { 
@@ -214,7 +218,8 @@
                 isAllChecked,
                 onToggleAll: (checked: boolean) => {
                     if (checked) {
-                        const newIds = availableRoles.map(r => r.id).filter(id => !selectedInheritances.includes(id));
+                        const validRoles = availableRoles.filter(r => r.hierarchy >= hierarchy);
+                        const newIds = validRoles.map(r => r.id).filter(id => !selectedInheritances.includes(id));
                         selectedInheritances = [...selectedInheritances, ...newIds];
                     } else {
                         const roleIds = availableRoles.map(r => r.id);
@@ -282,9 +287,10 @@
             {/if}
 
             <SectionAccordion title="Datos del Rol" open={true}>
-                <Grid cols={2} gap="var(--spacing-4)">
+                <Grid cols={3} gap="var(--spacing-4)">
                     <Input label="Código" bind:value={code} placeholder="Ej: ADMIN" required />
-                    <Input label="Descripción" bind:value={description} placeholder="Breve descripción de las funciones del rol..." />
+                    <Input label="Descripción" bind:value={description} placeholder="Breve descripción..." />
+                    <Input type="number" label="Jerarquía (1=Mayor)" bind:value={hierarchy} placeholder="Ej: 100" required />
                 </Grid>
             </SectionAccordion>
 
@@ -295,12 +301,14 @@
                         {#if colKey === 'description'}
                             <div class="switch-info">
                                 <span class="item-name">{row.code}</span>
-                                {#if row.description}<span class="item-code">{row.description}</span>{/if}
+                                <span class="item-desc">{row.description || 'Sin descripción'} (Jerarquía: {row.hierarchy})</span>
                             </div>
                         {:else if colKey === 'assign'}
                             <div class="center-switch">
                                 <Switch 
                                     checked={selectedInheritances.includes(row.id)} 
+                                    disabled={row.hierarchy < hierarchy}
+                                    title={row.hierarchy < hierarchy ? 'No puede heredar de un rol con mayor jerarquía' : ''}
                                     onchange={(checked) => toggleInheritance(row.id, checked)}
                                 />
                             </div>
