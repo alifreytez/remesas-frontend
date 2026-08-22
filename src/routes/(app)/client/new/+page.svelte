@@ -6,7 +6,8 @@
     
     import StepContact from './components/StepContact.svelte';
     import StepCalculator from './components/StepCalculator.svelte';
-    import StepSummary from './components/StepSummary.svelte';
+    import StepConfirmation from './components/StepConfirmation.svelte';
+    import RightSummary from './components/RightSummary.svelte';
     import StepSuccess from './components/StepSuccess.svelte';
 
     import { setHeader } from '$lib/stores/header.svelte';
@@ -19,7 +20,7 @@
     $effect(() => {
         setHeader(
             'Nueva Remesa',
-            true, // showBack
+            false, // showBack
             '', // backUrl not needed, using onBack
             () => {
                 if (currentStep === 1) {
@@ -53,6 +54,16 @@
             if (platformAccounts.length > 0) {
                 selectedPlatformAccountId = platformAccounts[0].id.toString();
             }
+
+            paymentMethods.forEach((m: any) => {
+                if (m.fieldsConfig) {
+                    m.fieldsConfig.forEach((f: any) => {
+                        if (recipientData[f.name] === undefined) {
+                            recipientData[f.name] = '';
+                        }
+                    });
+                }
+            });
         } catch (error) {
             console.error('Error fetching remittance options:', error);
         } finally {
@@ -72,7 +83,11 @@
         bank: '',
         accountNumber: '',
         phone: '',
-        bankDocument: ''
+        bankDocument: '',
+        email: '', personalEmail: '',
+        'phone-number': '',
+        'document-id': '',
+        concept: ''
     });
 
     let selectedPlatformAccountId = $state('');
@@ -82,14 +97,14 @@
         platformAccounts.find(acc => acc.id == selectedPlatformAccountId) || platformAccounts[0]
     );
 
-    let originCurrency = $derived(selectedPlatformAccount?.currency || { code: '', symbol: '' });
+    let originCurrency = $derived(selectedPlatformAccount?._Currency || { code: '', symbol: '' });
 
     // Deducir moneda destino según el método seleccionado en el Paso 1
     let destinationMethod = $derived(
-        paymentMethods.find(m => m.type_code === recipientData.method)
+        paymentMethods.find(m => m.typeCode === recipientData.method)
     );
     let destinationCurrency = $derived(
-        destinationMethod?.is_global ? { code: 'USD', symbol: '$', id: 1 } : { code: 'VES', symbol: 'Bs', id: 2 } // Mock IDs si no vienen
+        destinationMethod?.isGlobal ? { code: 'USD', symbol: '$', id: 1 } : { code: 'VES', symbol: 'Bs', id: 2 } // Mock IDs si no vienen
     );
 
     // Quote Data del Backend
@@ -112,7 +127,7 @@
                 try {
                     const res = await api.post<{ data: any }>('/remittances/quote', {
                         amount: Number(sendAmount),
-                        originCurrency: selectedPlatformAccount?.currency?.id || 1, // Fallback safe
+                        originCurrency: selectedPlatformAccount?.currency || 1, // Fallback safe
                         destinationCurrency: destinationCurrency.id || 2, // Fallback safe
                         originCountry: clientData?.originCountry || 2, // Usando data real del cliente (ideal pasarlo desde res.data.client.originCountry)
                         destinationCountry: 1, // Ej Venezuela
@@ -150,11 +165,11 @@
         if (isSubmitting) return;
         isSubmitting = true;
         try {
-            // Preparar el recipientAccountDetails en base al fields_config
+            // Preparar el recipientAccountDetails en base al fieldsConfig
             let details: Record<string, string> = { method: recipientData.method };
-            const methodDef = paymentMethods.find(m => m.type_code === recipientData.method);
+            const methodDef = paymentMethods.find(m => m.typeCode === recipientData.method);
             if (methodDef) {
-                methodDef.fields_config.forEach((f: any) => {
+                methodDef.fieldsConfig.forEach((f: any) => {
                     details[f.name] = recipientData[f.name];
                 });
             }
@@ -193,7 +208,7 @@
 <div class="remittance-flow">
     <!-- Stepper Indicator -->
     <div class="stepper">
-        {#each [1, 2, 3, 4] as step}
+        {#each [1, 2, 3] as step}
             <div class="step-item {step <= currentStep ? 'active' : ''}">
                 <div class="step-circle">
                     {#if step < currentStep}
@@ -202,7 +217,7 @@
                         {step}
                     {/if}
                 </div>
-                {#if step < 4}
+                {#if step < 3}
                     <div class="step-line {step < currentStep ? 'active-line' : ''}"></div>
                 {/if}
             </div>
@@ -236,16 +251,8 @@
                     {nextStep} 
                 />
             {:else if currentStep === 3}
-                <StepSummary 
-                    {sendAmount}
-                    commissionAmount={quoteData.totalFees}
-                    receivedAmount={quoteData.amountReceived}
-                    totalToPay={quoteData.amountToPay}
-                    {recipientData}
-                    {selectedRate}
-                    {paymentMethods}
-                    {countries}
-                    {isSubmitting}
+                <StepConfirmation 
+                    isSubmitting={isSubmitting}
                     {prevStep}
                     submitFn={submitRemittance} 
                 />
@@ -257,41 +264,21 @@
             {/if}
         </Section>
 
-        <div class="guide-panel-container desktop-only">
-            <Section class="guide-section">
-                {#if currentStep === 1}
-                    <SectionTitle title="Guía: Destinatario" />
-                    <div class="guide-content">
-                        <p>Seleccione o registre a la persona que recibirá el dinero.</p>
-                        <ul>
-                            <li><strong>Desde Directorio:</strong> Elija un contacto y cuenta previamente guardados para mayor rapidez.</li>
-                            <li><strong>Sin Registrar:</strong> Ingrese manualmente los datos de un nuevo destinatario.</li>
-                        </ul>
-                        <p class="guide-note">Asegúrese de que los datos bancarios coincidan exactamente con la identidad del titular de la cuenta para evitar rechazos bancarios.</p>
-                    </div>
-                {:else if currentStep === 2}
-                    <SectionTitle title="Guía: Montos y Tasas" />
-                    <div class="guide-content">
-                        <p>Calcule exactamente cuánto dinero se enviará y cuánto recibirá su destinatario.</p>
-                        <ul>
-                            <li><strong>Tasa de cambio:</strong> Se actualiza en tiempo real según el mercado.</li>
-                            <li><strong>Comisión:</strong> Costo operativo que se aplica según la ruta y método seleccionado.</li>
-                        </ul>
-                    </div>
-                {:else if currentStep === 3}
-                    <SectionTitle title="Guía: Verificación" />
-                    <div class="guide-content">
-                        <p>Revise detalladamente el resumen antes de proceder al pago.</p>
-                        <p class="guide-note">Una vez confirmada la operación, pasará a validación por nuestro equipo de finanzas.</p>
-                    </div>
-                {:else if currentStep === 4}
-                    <SectionTitle title="¡Felicidades!" />
-                    <div class="guide-content">
-                        <p>Su proceso de registro ha terminado. Ahora puede consultar el estado en su historial.</p>
-                    </div>
-                {/if}
-            </Section>
-        </div>
+        {#if currentStep < 4}
+            <div class="guide-panel-container desktop-only">
+                <RightSummary 
+                    {sendAmount}
+                    commissionAmount={quoteData.totalFees}
+                    receivedAmount={quoteData.amountReceived}
+                    totalToPay={quoteData.amountToPay}
+                    {recipientData}
+                    {selectedRate}
+                    {paymentMethods}
+                    {countries}
+                    {currentStep}
+                />
+            </div>
+        {/if}
     </div>
 </div>
 

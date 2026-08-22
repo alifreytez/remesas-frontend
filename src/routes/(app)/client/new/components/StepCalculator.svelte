@@ -33,7 +33,7 @@
     } = $props();
 
     function getMethodName(typeCode: string) {
-        return paymentMethods.find(m => m.type_code === typeCode)?.name || typeCode;
+        return paymentMethods.find(m => m.typeCode === typeCode)?.name || typeCode;
     }
 </script>
 
@@ -43,7 +43,7 @@
         <Stack gap="var(--spacing-6)">
             <Select 
                 label="¿Cómo deseas pagar?" 
-                options={platformAccounts.map(acc => ({ value: acc.id, label: `${getMethodName(acc.paymentMethod)} (${acc.currency.code})` }))}
+                options={platformAccounts.map(acc => ({ value: acc.id, label: `${acc._PaymentMethod?.name} (${acc._Currency?.code})` }))}
                 bind:value={selectedPlatformAccountId}
             />
 

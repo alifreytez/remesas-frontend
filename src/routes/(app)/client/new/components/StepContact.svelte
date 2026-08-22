@@ -4,6 +4,7 @@
     import Button from '$lib/components/ui/Button.svelte';
     import Input from '$lib/components/ui/Input.svelte';
     import Select from '$lib/components/ui/Select.svelte';
+    import Checkbox from '$lib/components/ui/Checkbox.svelte';
     import SectionAccordion from '$lib/components/ui/SectionAccordion.svelte';
     import Grid from '$lib/components/ui/Grid.svelte';
     import Stack from '$lib/components/ui/Stack.svelte';
@@ -29,18 +30,18 @@
 
     let currentMethodConfig = $derived(
         recipientData.method
-            ? paymentMethods.find(m => m.type_code === recipientData.method) || null
+            ? paymentMethods.find(m => m.typeCode === recipientData.method) || null
             : null
     );
 
     $effect.pre(() => {
-        const available = paymentMethods.map(m => m.type_code);
+        const available = paymentMethods.map(m => m.typeCode);
         if (available.length > 0 && !available.includes(recipientData.method)) {
             recipientData.method = available[0];
         }
         
         if (currentMethodConfig) {
-            currentMethodConfig.fields_config.forEach((field: any) => {
+            currentMethodConfig.fieldsConfig.forEach((field: any) => {
                 if (recipientData[field.name] === undefined) {
                     recipientData[field.name] = '';
                 }
@@ -83,9 +84,9 @@
             const bank = selectedContact.bankDetails.find((b: any) => b.id === selectedBankId);
             if (bank) {
                 recipientData.method = bank.method;
-                const config = paymentMethods.find(m => m.type_code === bank.method);
+                const config = paymentMethods.find(m => m.typeCode === bank.method);
                 if (config) {
-                    for (const field of config.fields_config) {
+                    for (const field of config.fieldsConfig) {
                         recipientData[field.name] = bank[field.name] || '';
                     }
                 }
@@ -100,7 +101,7 @@
             if (!recipientData.firstName || !recipientData.country || !recipientData.method) return false;
             if (!currentMethodConfig) return false;
             
-            for (const field of currentMethodConfig.fields_config) {
+            for (const field of currentMethodConfig.fieldsConfig) {
                 if (field.required && !recipientData[field.name]) {
                     return false;
                 }
@@ -110,7 +111,7 @@
     });
     function formatBankDetails(b: any) {
         const parts = [];
-        const config = paymentMethods.find(m => m.type_code === b.method);
+        const config = paymentMethods.find(m => m.typeCode === b.method);
         if (config?.name) parts.push(config.name);
         if (b.bank) parts.push(b.bank);
         if (b.phone) parts.push(b.phone);
@@ -192,14 +193,14 @@
                         <Select 
                             label="Método de Pago" 
                             placeholder="Selecciona un método"
-                            options={paymentMethods.map(m => ({ value: m.type_code, label: m.name }))}
+                            options={paymentMethods.map(m => ({ value: m.typeCode, label: m.name }))}
                             bind:value={recipientData.method}
                         />
                     </Grid>
 
                     {#if currentMethodConfig}
                         <Grid cols={2}>
-                            {#each currentMethodConfig.fields_config as field}
+                            {#each currentMethodConfig.fieldsConfig as field}
                                 <div class="form-field-wrapper">
                                     <Input 
                                         label={field.label} 
@@ -220,6 +221,9 @@
             <SectionAccordion title="Detalles de Envío">
                 <Grid cols={1}>
                     <Input label="Concepto (Opcional)" bind:value={recipientData.concept} />
+                    <div class="save-contact-wrapper">
+                        <Checkbox label="Guardar destinatario en agenda frecuente" bind:checked={recipientData.saveAsContact} />
+                    </div>
                 </Grid>
             </SectionAccordion>
         </Stack>
@@ -277,5 +281,6 @@
         border-top: 1px solid var(--gray-200);
         padding-top: var(--spacing-6);
     }
+    .save-contact-wrapper { display: flex; align-items: center; justify-content: flex-start; margin-top: var(--spacing-4); padding-top: var(--spacing-4); border-top: 1px solid var(--gray-200); }
 </style>
 
