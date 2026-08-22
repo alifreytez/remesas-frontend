@@ -1,8 +1,11 @@
 <script lang="ts">
-    import { Send } from 'lucide-svelte';
+    import { Send, ChevronRight } from 'lucide-svelte';
+    import StatusBadge from './StatusBadge.svelte';
+    import { goto } from '$app/navigation';
     
     let { 
         id, 
+        realId,
         date, 
         destination, 
         amountPaid, 
@@ -10,19 +13,13 @@
         status 
     } = $props<{
         id: string;
+        realId?: string | number;
         date: string;
         destination: string;
         amountPaid: string;
         amountReceived: string;
         status: string;
     }>();
-
-    // Determinar clase del badge de estado
-    let badgeClass = $derived(
-        (status === 'Rechazada' || status === 'Cancelada') ? 'badge-danger' : 
-        (status === 'Aprobada' || status === 'Completada') ? 'badge-success' : 
-        'badge-warning'
-    );
 </script>
 
 <div class="tx-item-wide">
@@ -46,7 +43,12 @@
         <span class="tx-value font-mono text-primary">{amountReceived}</span>
     </div>
     <div class="tx-col tx-status-wrap">
-        <span class="tx-status-badge {badgeClass}">{status}</span>
+        <StatusBadge {status} />
+    </div>
+    <div class="tx-col tx-action">
+        <button class="icon-btn" onclick={() => goto(`/client/history/${realId || id.replace('#', '')}`)} title="Ver Detalles">
+            <ChevronRight size={20} />
+        </button>
     </div>
 </div>
 
@@ -54,18 +56,13 @@
     /* Tx Row Layout - CSS estandarizado de Home */
     .tx-item-wide {
         display: grid;
-        grid-template-columns: 48px 1.5fr 1fr 1fr 1.2fr 100px;
+        grid-template-columns: 48px 1.2fr 1fr 1.2fr 1.2fr 140px auto;
         align-items: center;
         gap: 24px;
         padding: 16px;
         border: 1px solid var(--gray-200);
         border-radius: 16px;
-        transition: border-color 0.2s;
         background-color: var(--white);
-    }
-
-    .tx-item-wide:hover {
-        border-color: var(--gray-300);
     }
 
     .tx-icon {
@@ -92,9 +89,9 @@
     }
 
     .tx-name {
-        font-weight: 700;
-        font-size: 15px;
-        color: var(--gray-900);
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--text-main);
     }
 
     .tx-desc {
@@ -106,14 +103,15 @@
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: var(--gray-400);
+        color: var(--gray-500);
         font-weight: 600;
     }
 
     .tx-value {
         font-size: 14px;
-        font-weight: 600;
-        color: var(--gray-900);
+        font-weight: 500;
+        color: var(--text-main);
+        line-height: 1.4;
     }
 
     .font-mono {
@@ -122,7 +120,6 @@
 
     .text-primary {
         color: var(--primary-700);
-        font-weight: 700;
     }
 
     .tx-status-wrap {
@@ -132,33 +129,28 @@
         justify-content: flex-end;
     }
 
-    .tx-status-badge {
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: capitalize;
-        white-space: nowrap;
+    .icon-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: none;
+        background-color: transparent;
+        color: var(--gray-400);
+        cursor: pointer;
+        transition: all 0.2s;
     }
 
-    .badge-warning {
-        background-color: var(--warning-50);
-        color: var(--warning-700);
-    }
-
-    .badge-success {
-        background-color: #ecfdf5; /* Tailwind emerald-50 */
-        color: var(--accent-green);
-    }
-
-    .badge-danger {
-        background-color: var(--danger-50);
-        color: var(--danger-600);
+    .icon-btn:hover {
+        background-color: var(--gray-100);
+        color: var(--gray-900);
     }
 
     @media (max-width: 1200px) {
         .tx-item-wide {
-            grid-template-columns: 48px 1.2fr 1fr 1.2fr; /* ID, Pagado/Destino, Recibir/Status */
+            grid-template-columns: 48px 1.2fr 1fr 1.2fr auto;
             grid-template-rows: auto auto;
             row-gap: 20px;
             column-gap: 16px;
@@ -197,6 +189,14 @@
             grid-row: 2;
             justify-content: flex-start;
         }
+
+        .tx-action {
+            grid-column: 5;
+            grid-row: 1 / span 2;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
     }
 
     @media (max-width: 768px) {
@@ -209,5 +209,12 @@
         .tx-status-wrap {
             justify-content: flex-start;
         }
+        .tx-action {
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            margin-top: -8px;
+        }
     }
 </style>
+

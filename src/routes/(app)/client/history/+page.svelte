@@ -5,205 +5,176 @@
     import Input from '$lib/components/ui/Input.svelte';
     import Select from '$lib/components/ui/Select.svelte';
     import Button from '$lib/components/ui/Button.svelte';
-    import TransactionCard from '$lib/components/ui/TransactionCard.svelte';
     import Section from '$lib/components/layout/Section.svelte';
-    import Pagination from '$lib/components/ui/Pagination.svelte';
+    import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
+    import TransactionGrid from '$lib/components/ui/TransactionGrid.svelte';
+    import { setHeader } from '$lib/stores/header.svelte';
+    import { api } from '$lib/utils/api';
 
     let loading = $state(false);
     let history = $state<any[]>([]);
     let searchQuery = $state('');
-    let statusFilter = $state('ALL');
+    let statusFilter = $state('');
+
+    // Pagination (TransactionGrid already handles UI pagination, but we want server-side if it's large)
+    // Currently, we'll fetch a batch and let TransactionGrid handle it or handle it here.
+    // TransactionGrid expects all data and paginates internally based on the code I can guess.
+    // To be safe, we'll fetch up to 100 or paginate if TransactionGrid supports it.
+    
+    $effect(() => {
+        setHeader('Historial', false, '', null);
+        return () => setHeader('', false, '', null);
+    });
+
+    async function fetchHistory() {
+        try {
+            loading = true;
+            let query = new URLSearchParams();
+            query.append('limit', '100');
+            if (statusFilter) query.append('filters[status]', statusFilter);
+            if (searchQuery) query.append('filters[id]', searchQuery); // Usually ID search in remittances
+
+            const res = await api.get<{data: {rows: any[]}}>(`/remittances?${query.toString()}`);
+            const dataRows = res.data?.rows || (Array.isArray(res.data) ? res.data : []);
+            
+            history = dataRows.map(r => ({
+                id: `#${r.id}`,
+                realId: r.id,
+                date: new Date(r.createdAt).toLocaleDateString(),
+                beneficiary: r._RecipientDetails?.contactName || 'Desconocido',
+                destination: r._DestinationCountry?.name || 'Desconocido',
+                amountSend: r.amountSent.toString(),
+                amountReceive: r.amountReceived?.toString() || '0.00',
+                currency: r._DestinationCountry?.currencyCode || '',
+                status: r.status
+            }));
+        } catch (error) {
+            console.error('Error fetching history:', error);
+            history = [];
+        } finally {
+            loading = false;
+        }
+    }
 
     onMount(() => {
-        loading = true;
-        // Mock data
-        setTimeout(() => {
-            const baseHistory = [
-                { id: 'RM-1030', date: '11 Ago 2026', beneficiary: 'Juan Pérez', destination: 'Venezuela', amountSend: '100.00', amountReceive: '4250.00', currency: 'Bs', status: 'Pendiente Pago' },
-                { id: 'RM-1029', date: '05 Ago 2026', beneficiary: 'Maria Gomez', destination: 'Colombia', amountSend: '150.00', amountReceive: '600000.00', currency: 'COP', status: 'En Proceso' },
-                { id: 'RM-1028', date: '28 Jul 2026', beneficiary: 'Juan Pérez', destination: 'Venezuela', amountSend: '50.00', amountReceive: '2125.00', currency: 'Bs', status: 'Completada' },
-                { id: 'RM-1027', date: '15 Jul 2026', beneficiary: 'Pedro Pascal', destination: 'Chile', amountSend: '300.00', amountReceive: '240000.00', currency: 'CLP', status: 'Completada' },
-                { id: 'RM-1026', date: '01 Jul 2026', beneficiary: 'Juan Pérez', destination: 'Venezuela', amountSend: '200.00', amountReceive: '8500.00', currency: 'Bs', status: 'Cancelada' }
-            ];
-            
-            // Generar 100 items para demostrar la paginación larga
-            const generatedHistory = [];
-            for (let i = 1; i <= 100; i++) {
-                const base = baseHistory[i % 5];
-                generatedHistory.push({
-                    ...base,
-                    id: `RM-${2000 + i}`,
-                    date: `${(i % 28) + 1} Ago 2026`
-                });
-            }
-            history = generatedHistory;
-            loading = false;
+        fetchHistory();
+    });
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    function handleSearch() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            fetchHistory();
         }, 500);
-    });
-
-    let filteredHistory = $derived(
-        history.filter(h => {
-            const matchSearch = h.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                h.beneficiary.toLowerCase().includes(searchQuery.toLowerCase());
-            const matchFilter = statusFilter === 'ALL' || h.status === statusFilter;
-            return matchSearch && matchFilter;
-        })
-    );
-
-    // Lógica de paginación
-    let currentPage = $state(1);
-    let itemsPerPage = $state(5);
-
-    let paginatedHistory = $derived(
-        filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-    );
-
-    // Resetear a página 1 si cambia la búsqueda o filtro
-    $effect(() => {
-        searchQuery;
-        statusFilter;
-        currentPage = 1;
-    });
-
-    const statusOptions = [
-        { value: 'ALL', label: 'Todos los estados' },
-        { value: 'Pendiente Pago', label: 'Pendiente Pago' },
-        { value: 'En Proceso', label: 'En Proceso' },
-        { value: 'Completada', label: 'Completada' },
-        { value: 'Cancelada', label: 'Cancelada' }
-    ];
-
-    function getStatusClass(status: string) {
-        if (status === 'Completada') return 'status-success';
-        if (status === 'Cancelada') return 'status-danger';
-        if (status === 'En Proceso') return 'status-warning';
-        return 'status-info'; // Pendiente Pago
     }
+
+    // El componente TransactionGrid espera:
+    // { id, date, beneficiary, destination, amountSend, amountReceive, currency, status }
 </script>
 
-<Section class="history-panel full-width">
-    <div class="filters-section">
-        <div class="search-box">
-            <Input 
-                placeholder="Buscar por ID o beneficiario..." 
-                bind:value={searchQuery}
-            />
-        </div>
-        <div class="status-box">
-            <Select 
-                label="" 
-                options={statusOptions}
-                bind:value={statusFilter}
-            />
-        </div>
-    </div>
-
-    {#if loading}
-        <p class="loading-text">Cargando historial...</p>
-    {:else if filteredHistory.length === 0}
-        <div class="empty-state">
-            <FileText size={48} color="var(--gray-300)" />
-            <h3>No se encontraron remesas</h3>
-            <p>No tienes envíos que coincidan con los criterios de búsqueda.</p>
-        </div>
-    {:else}
-        <div class="tx-list">
-            {#each paginatedHistory as item}
-                <TransactionCard 
-                    id={item.id}
-                    date={item.date}
-                    destination={item.destination}
-                    amountPaid={`USD ${item.amountSend}`}
-                    amountReceived={`${item.currency} ${item.amountReceive}`}
-                    status={item.status}
+<div class="history-page">
+    <Section>
+        <SectionTitle title="Todas tus Transacciones" subtitle="Sigue el estado de tus envíos pasados y actuales" />
+        
+        <div class="filters-toolbar">
+            <div class="search-box">
+                <Input 
+                    type="text" 
+                    placeholder="Buscar por ID..." 
+                    id="search" 
+                    bind:value={searchQuery}
+                    oninput={handleSearch}
+                >
+                    {#snippet leftIcon()}
+                        <Search size={18} color="var(--gray-400)" />
+                    {/snippet}
+                </Input>
+            </div>
+            
+            <div class="filter-box">
+                <Select 
+                    label="" 
+                    id="status" 
+                    bind:value={statusFilter}
+                    onchange={handleSearch}
+                    options={[
+                        {value: '', label: 'Todos los estados'},
+                        {value: 'PENDING', label: 'Pendiente'},
+                        {value: 'APPROVED', label: 'Completada'},
+                        {value: 'REJECTED', label: 'Cancelada'}
+                    ]}
                 />
-            {/each}
+            </div>
         </div>
 
-        {#if filteredHistory.length > itemsPerPage}
-            <Pagination 
-                bind:currentPage 
-                totalItems={filteredHistory.length} 
-                bind:itemsPerPage 
-            />
+        {#if loading && history.length === 0}
+            <div class="loading-state">
+                <p>Cargando historial...</p>
+            </div>
+        {:else if history.length === 0 && !searchQuery && !statusFilter}
+            <div class="empty-state">
+                <FileText size={48} color="var(--gray-300)" />
+                <h3>Aún no tienes envíos registrados</h3>
+                <p>Cuando realices envíos a tus destinatarios, aparecerán aquí.</p>
+                <Button variant="primary" onclick={() => goto('/client/new')} style="margin-top: 16px;">
+                    Hacer mi primer envío
+                </Button>
+            </div>
+        {:else}
+            <TransactionGrid data={history} />
         {/if}
-    {/if}
-</Section>
+    </Section>
+</div>
 
 <style>
-    .filters-section {
+    .history-page {
         display: flex;
-        gap: 16px;
-        flex-wrap: wrap;
-        padding-bottom: 16px;
-        border-bottom: 1px solid var(--gray-200);
-        margin-bottom: 16px;
+        flex-direction: column;
+        width: 100%;
         
-        /* Reset margins from internal components to ensure symmetrical spacing */
-        --select-mb: 0;
     }
-    
-    .filters-section :global(.input-group) {
-        margin-bottom: 0 !important;
+
+    .filters-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--spacing-4);
+        margin-bottom: var(--spacing-6);
+        align-items: center;
+        justify-content: flex-end;
     }
 
     .search-box {
-        flex: 1;
-        min-width: 250px;
+        width: 320px;
+        max-width: 100%;
     }
 
-    .status-box {
+    .filter-box {
         width: 200px;
     }
 
-    .tx-list {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    }
-
-    @media (max-width: 768px) {
-        .tx-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(225px, 1fr));
-            gap: 16px;
-        }
-        
-        .status-box {
-            width: 100%;
-        }
-    }
-
-    .empty-state {
+    .loading-state, .empty-state {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         padding: 64px 24px;
         text-align: center;
-        background-color: var(--gray-50);
-        border-radius: 16px;
+        background-color: var(--white);
         border: 1px dashed var(--gray-300);
-        gap: 12px;
+        border-radius: var(--radius-xl);
+        gap: 8px;
     }
 
     .empty-state h3 {
         font-size: 18px;
-        color: var(--gray-900);
         font-weight: 600;
+        color: var(--gray-900);
         margin: 0;
     }
 
     .empty-state p {
-        color: var(--gray-500);
         font-size: 14px;
-        max-width: 300px;
-        margin: 0;
-    }
-
-    .loading-text {
-        text-align: center;
         color: var(--gray-500);
-        padding: 48px;
+        margin: 0;
     }
 </style>
