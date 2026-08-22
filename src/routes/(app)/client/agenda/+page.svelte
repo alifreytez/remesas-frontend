@@ -9,6 +9,7 @@
     import { api } from '$lib/utils/api';
     import { goto } from '$app/navigation';
     import Input from '$lib/components/ui/Input.svelte';
+    import { setHeader } from '$lib/stores/header.svelte';
 
     let loading = $state(false);
     let contacts = $state<any[]>([]);
@@ -16,101 +17,120 @@
 
     // Pagination
     let currentPage = $state(1);
-    const itemsPerPage = 6;
+    let itemsPerPage = $state(6);
+    let totalItems = $state(0);
 
-    // Mock data initially if no API yet
-    onMount(async () => {
+    $effect(() => {
+        setHeader('Directorio de Destinatarios', false, '', null);
+        return () => setHeader('', false, '', null);
+    });
+
+    async function fetchContacts() {
         try {
             loading = true;
-            // TODO: Fetch from actual contacts API
-            // const res = await api.get('/api/v1/contacts');
-            // contacts = res.data?.data || [];
+            const res = await api.get<{data: {rows: any[], count: number}}>(`/users/me/contacts?page=${currentPage}&limit=${itemsPerPage}&search=${searchQuery}`);
             
-            // Mock Data
-            setTimeout(() => {
-                contacts = [
-                    { id: 1, firstName: 'Juan', lastName: 'Pérez', documentNumber: 'V-12345678', phone: '+584121234567', _Country: { name: 'Venezuela' } },
-                    { id: 2, firstName: 'Maria', lastName: 'Gomez', documentNumber: 'V-87654321', phone: '+584241112233', _Country: { name: 'Colombia' } },
-                    { id: 3, firstName: 'Carlos', lastName: 'Ramirez', documentNumber: 'V-22334455', phone: '+584145556677', _Country: { name: 'Peru' } },
-                    { id: 4, firstName: 'Ana', lastName: 'Torres', documentNumber: 'V-99887766', phone: '+584249998877', _Country: { name: 'Chile' } }
-                ];
-                loading = false;
-            }, 500);
+            // Adjusting to different possible response structures
+            if (res.data && res.data.rows) {
+                contacts = res.data.rows;
+                totalItems = res.data.count || 0;
+            } else if (Array.isArray(res.data)) {
+                contacts = res.data;
+                totalItems = contacts.length;
+            } else if (Array.isArray(res)) {
+                contacts = res as any[];
+                totalItems = contacts.length;
+            } else {
+                contacts = [];
+                totalItems = 0;
+            }
         } catch (error) {
-            console.error(error);
+            console.error('Error fetching contacts:', error);
+            contacts = [];
+        } finally {
             loading = false;
         }
+    }
+
+    onMount(() => {
+        fetchContacts();
     });
 
-    let filteredContacts = $derived(
-        contacts.filter(c => 
-            `${c.firstName} ${c.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.documentNumber.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-    );
-
-    let totalPages = $derived(Math.max(1, Math.ceil(filteredContacts.length / itemsPerPage)));
-    let paginatedContacts = $derived(
-        filteredContacts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-    );
-
-    // Reset page when searching
-    $effect(() => {
-        if (searchQuery) {
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    function handleSearch() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
             currentPage = 1;
-        }
-    });
+            fetchContacts();
+        }, 500);
+    }
+
+    function handlePageChange(newPage: number) {
+        currentPage = newPage;
+        fetchContacts();
+    }
+
+    let filteredContacts = $derived(contacts);
+
 </script>
 
 <div class="agenda-page">
-    <Section class="full-width">
-        <SectionTitle 
-            title="Directorio de Contactos" 
-            subtitle="Administra tus beneficiarios frecuentes"
-        >
+    <Section>
+        <SectionTitle title="Mis Contactos" subtitle="Gestiona a las personas a las que envías dinero">
             {#snippet action()}
-                <Button variant="primary" onclick={() => goto('/client/agenda/new')}>
-                    <Plus size={18} /> Nuevo Contacto
-                </Button>
+                {#if totalItems > 0 || searchQuery !== ''}
+                    <Button variant="primary" onclick={() => goto('/client/agenda/new')}>
+                        <Plus size={16} style="margin-right: 8px;" />
+                        Nuevo Contacto
+                    </Button>
+                {/if}
             {/snippet}
         </SectionTitle>
 
-        <div class="filters-section">
-            <div class="search-bar">
+        <div class="agenda-toolbar">
+            <div class="search-wrapper">
                 <Input 
-                    placeholder="Buscar por nombre o documento..." 
+                    type="text" 
+                    placeholder="Buscar por nombre..." 
+                    id="searchContact"
                     bind:value={searchQuery}
+                    oninput={handleSearch}
                 />
             </div>
         </div>
 
-        {#if loading}
-            <p class="loading-text">Cargando contactos...</p>
-        {:else if filteredContacts.length === 0}
-            <div class="empty-state">
-                <User size={48} color="var(--gray-300)" />
-                <h3>No tienes contactos guardados</h3>
-                <p>Agrega un beneficiario para agilizar tus futuros envíos.</p>
+        {#if loading && contacts.length === 0}
+            <div class="loading-state">
+                <p>Cargando tus contactos...</p>
             </div>
-        {:else}
+        {:else if filteredContacts.length > 0}
             <div class="contacts-grid">
-                {#each paginatedContacts as contact}
-                    <ContactCard 
+                {#each filteredContacts as contact}
+                    <ContactCard
                         id={contact.id}
-                        firstName={contact.firstName}
-                        lastName={contact.lastName}
-                        country={contact._Country?.name}
-                        phone={contact.phone}
+                        name={`${contact.firstName || contact.first_name || ''} ${contact.lastName || contact.last_name || ''}`.trim()}
+                        country={contact._Country?.name || 'Desconocido'}
+                        onClick={() => goto(`/client/agenda/${contact.id}`)}
                     />
                 {/each}
             </div>
 
-            <!-- Pagination Container (matching History layout) -->
-            <div class="pagination-container">
-                <Pagination 
-                    bind:currentPage={currentPage}
-                    {totalPages}
+            <div class="pagination-wrapper">
+                <Pagination
+                    currentPage={currentPage}
+                    totalPages={Math.ceil(totalItems / itemsPerPage) || 1}
+                    onPageChange={handlePageChange}
                 />
+            </div>
+        {:else}
+            <div class="empty-state">
+                <User size={48} color="var(--gray-300)" />
+                <h3>No tienes contactos guardados</h3>
+                <p>Agrega a tus familiares y amigos para enviarles dinero fácilmente.</p>
+                <Button variant="primary" onclick={() => goto('/client/agenda/new')} style="margin-top: 16px;">
+                    <Plus size={16} style="margin-right: 8px;" />
+                    Agregar el primero
+                </Button>
             </div>
         {/if}
     </Section>
@@ -120,74 +140,60 @@
     .agenda-page {
         display: flex;
         flex-direction: column;
-        gap: 24px;
-    }
-
-    .filters-section {
-        display: flex;
-        gap: 16px;
-        flex-wrap: wrap;
-        padding-bottom: 16px;
-        border-bottom: 1px solid var(--gray-200);
-        margin-bottom: 16px;
-    }
-
-    .filters-section :global(.input-group) {
-        margin-bottom: 0 !important;
-    }
-
-    .search-bar {
-        max-width: 400px;
+        gap: var(--spacing-6);
+        
         width: 100%;
+    }
+
+    .agenda-toolbar {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: var(--spacing-4);
+        margin-bottom: var(--spacing-6);
+    }
+
+    .search-wrapper {
+        width: 320px;
+        max-width: 100%;
     }
 
     .contacts-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: var(--spacing-4);
+        margin-bottom: var(--spacing-8);
     }
 
-    /* Container Queries para un responsive perfecto interno */
-    @container section (max-width: 900px) {
-        .contacts-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
+    .pagination-wrapper {
+        display: flex;
+        justify-content: center;
+        margin-top: var(--spacing-6);
     }
 
-    @container section (max-width: 500px) {
-        .contacts-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    .empty-state {
+    .loading-state, .empty-state {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 48px 24px;
+        padding: 64px 24px;
         text-align: center;
-        background-color: var(--gray-50);
-        border-radius: 16px;
+        background-color: var(--white);
         border: 1px dashed var(--gray-300);
-        gap: 12px;
+        border-radius: var(--radius-xl);
+        gap: 8px;
     }
 
     .empty-state h3 {
         font-size: 18px;
-        color: var(--gray-900);
         font-weight: 600;
+        color: var(--gray-900);
+        margin: 0;
     }
 
     .empty-state p {
-        color: var(--gray-500);
         font-size: 14px;
-        max-width: 300px;
-    }
-
-    .loading-text {
         color: var(--gray-500);
-        text-align: center;
-        padding: 48px;
+        margin: 0;
     }
 </style>
