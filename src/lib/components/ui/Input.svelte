@@ -25,6 +25,10 @@
         let val = input.value;
         
         switch (format) {
+            case 'number':
+                // Solo números
+                val = val.replace(/[^0-9]/g, '');
+                break;
             case 'name':
                 // Solo letras y espacios (incluye acentos)
                 val = val.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g, '');

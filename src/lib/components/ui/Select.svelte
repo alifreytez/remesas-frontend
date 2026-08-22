@@ -1,23 +1,23 @@
-﻿<script lang="ts">
+<script lang="ts">
     import { ChevronDown, Search, Check } from 'lucide-svelte';
     import { onMount, onDestroy, tick } from 'svelte';
 
     let {
-        label = '',
+        value = $bindable(),
         options = [],
-        value = $bindable(''),
+        label = '',
+        placeholder = '-- Seleccione --',
         disabled = false,
-        placeholder = 'Selecciona una opción',
         required = false,
         onchange
     }: {
+        value?: string | number | undefined;
+        options: { value: string | number; label: string }[];
         label?: string;
-        options: { value: string; label: string }[];
-        value?: string;
-        disabled?: boolean;
         placeholder?: string;
+        disabled?: boolean;
         required?: boolean;
-        onchange?: (val: string) => void;
+        onchange?: (val: string | number) => void;
     } = $props();
 
     let open = $state(false);
