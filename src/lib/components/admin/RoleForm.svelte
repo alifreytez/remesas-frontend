@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { api } from '$lib/utils/api';
     import Input from '$lib/components/ui/Input.svelte';
     import Switch from '$lib/components/ui/Switch.svelte';
@@ -9,10 +9,16 @@
     import DataGrid from '$lib/components/ui/DataGrid.svelte';
     import { untrack } from 'svelte';
     import { alertMsg } from '$lib/stores/confirm.svelte';
+    import PermissionGuard from '$lib/components/auth/PermissionGuard.svelte';
 
-    let { recordId = null, onSuccess } = $props<{
+    let { 
+        recordId = null, 
+        onSuccess,
+        onCancel
+    } = $props<{
         recordId?: string | number | null;
         onSuccess: () => void;
+        onCancel: () => void;
     }>();
 
     let currentRoleId = $state(recordId);
@@ -340,9 +346,14 @@
             </SectionAccordion>
 
             <div class="form-actions">
-                <Button variant="primary" onclick={save} disabled={saving}>
-                    {saving ? 'Guardando...' : (currentRoleId ? 'Actualizar Rol' : 'Crear Rol')}
+                <Button variant="secondary" onclick={onCancel} disabled={saving}>
+                    Cancelar
                 </Button>
+                <PermissionGuard permission={currentRoleId ? 'UI:UPDATE:ROLES' : 'UI:CREATE:ROLES'}>
+                    <Button variant="primary" onclick={save} disabled={saving}>
+                        {saving ? 'Guardando...' : (currentRoleId ? 'Actualizar Rol' : 'Crear Rol')}
+                    </Button>
+                </PermissionGuard>
             </div>
         </Stack>
     {/if}
@@ -353,6 +364,7 @@
         width: 100%;
         max-width: 100%;
         min-width: 0;
+        color: var(--gray-300);
     }
 
     .loading-state {
@@ -406,8 +418,10 @@
     .form-actions {
         display: flex;
         justify-content: flex-end;
+        gap: var(--spacing-3);
         margin-top: var(--spacing-8);
         padding-top: var(--spacing-6);
         border-top: 1px solid var(--gray-200);
     }
 </style>
+

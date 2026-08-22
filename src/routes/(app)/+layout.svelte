@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { auth } from '$lib/stores/auth.svelte';
     import { headerState } from '$lib/stores/header.svelte';
     import Sidebar from '$lib/components/layout/Sidebar.svelte';
@@ -89,3 +89,4 @@
         }
     }
 </style>
+

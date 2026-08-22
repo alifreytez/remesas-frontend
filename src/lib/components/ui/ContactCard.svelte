@@ -1,19 +1,17 @@
-<script lang="ts">
-    import { MapPin, Phone, Edit, Trash2 } from 'lucide-svelte';
+﻿<script lang="ts">
+    import { MapPin, Edit, Trash2 } from 'lucide-svelte';
     import { goto } from '$app/navigation';
 
     let { 
         id, 
         firstName, 
         lastName, 
-        country, 
-        phone 
+        country
     }: {
         id: string | number;
         firstName: string;
         lastName: string;
         country: string;
-        phone: string;
     } = $props();
 
     function handleEdit() {
@@ -35,7 +33,6 @@
             <div class="contact-name">{firstName} {lastName}</div>
             <div class="contact-meta">
                 <span class="meta-item"><MapPin size={12} /> {country || 'N/A'}</span>
-                <span class="meta-item"><Phone size={12} /> {phone}</span>
             </div>
         </div>
     </div>
@@ -146,3 +143,4 @@
         color: var(--danger-600);
     }
 </style>
+

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     let {
         checked = $bindable(false),
         disabled = false,
@@ -67,3 +67,4 @@
         transform: translateX(16px);
     }
 </style>
+

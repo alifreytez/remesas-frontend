@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import '../app.css';
     import { onMount } from 'svelte';
     import { PUBLIC_APP_NAME } from '$env/static/public';
@@ -26,3 +26,4 @@
 {@render children()}
 
 <ConfirmModal />
+

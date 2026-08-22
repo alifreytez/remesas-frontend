@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { ChevronLeft, ChevronRight } from 'lucide-svelte';
 
     let {
@@ -97,8 +97,8 @@
     
     .pagination-container.with-border {
         border-top: 1px solid var(--gray-200);
-        padding-top: 16px;
-        margin-top: 16px;
+        padding-top: 24px;
+        margin-top: 0;
     }
 
     .pagination-info {
@@ -237,3 +237,4 @@
         }
     }
 </style>
+

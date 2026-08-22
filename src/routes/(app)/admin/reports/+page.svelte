@@ -89,7 +89,7 @@
 
 <style>
     .reports-container {
-        max-width: 1000px;
+        
     }
 
     .export-box {
@@ -120,3 +120,4 @@
         margin-top: var(--spacing-8);
     }
 </style>
+

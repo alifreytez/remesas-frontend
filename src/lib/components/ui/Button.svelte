@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import type { Snippet } from 'svelte';
 
     let {
@@ -129,3 +129,4 @@
         align-items: center;
     }
 </style>
+

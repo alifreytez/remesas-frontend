@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { api } from '$lib/utils/api';
     import Input from '$lib/components/ui/Input.svelte';
     import Select from '$lib/components/ui/Select.svelte';
@@ -7,6 +7,7 @@
     import Grid from '$lib/components/ui/Grid.svelte';
     import Stack from '$lib/components/ui/Stack.svelte';
     import SectionAccordion from '$lib/components/ui/SectionAccordion.svelte';
+    import PermissionGuard from '$lib/components/auth/PermissionGuard.svelte';
     import DataGrid from '$lib/components/ui/DataGrid.svelte';
     import { Save, X } from 'lucide-svelte';
     import { untrack } from 'svelte';
@@ -27,7 +28,7 @@
     let lastName = $state('');
     let documentNumber = $state('');
     let phone = $state('');
-    let username = $state('');
+    let username = $derived(documentNumber ? 'R' + documentNumber.replace(/\D/g, '') : '');
     let email = $state('');
     let password = $state('');
     
@@ -63,7 +64,6 @@
                 const user = userRes?.data;
                 
                 if (user) {
-                    username = user.username || '';
                     email = user.email || '';
                     
                     if (user._Person) {
@@ -85,7 +85,7 @@
             } else {
                 // Reset form for creation
                 firstName = ''; lastName = ''; documentNumber = ''; phone = '';
-                username = ''; email = ''; password = '';
+                email = ''; password = '';
                 selectedRoleId = ''; selectedPermissions = [];
             }
 
@@ -247,7 +247,7 @@
 
             <SectionAccordion title="Datos de la Cuenta y Seguridad" open={true}>
                 <Grid cols={2} gap="var(--spacing-4)">
-                    <Input label="Usuario" bind:value={username} required placeholder="Ej: jperez" format="username" />
+                    <Input label="Usuario" value={username} required disabled placeholder="Ej: R12345678" format="username" />
                     <Select 
                         label="Rol del Usuario" 
                         options={availableRoles.map(r => ({ value: r.id, label: r.name || r.code }))}
@@ -291,9 +291,14 @@
             </SectionAccordion>
 
             <div class="form-actions">
-                <Button variant="primary" onclick={save} disabled={saving}>
-                    {saving ? 'Guardando...' : (recordId ? 'Actualizar Usuario' : 'Crear Usuario')}
+                <Button variant="secondary" onclick={onCancel} disabled={saving}>
+                    Cancelar
                 </Button>
+                <PermissionGuard permission={recordId ? 'UI:UPDATE:USERS' : 'UI:CREATE:USERS'}>
+                    <Button variant="primary" onclick={save} disabled={saving}>
+                        {saving ? 'Guardando...' : (recordId ? 'Actualizar Usuario' : 'Crear Usuario')}
+                    </Button>
+                </PermissionGuard>
             </div>
         </Stack>
     {/if}
@@ -344,3 +349,4 @@
         border-top: 1px solid var(--gray-200);
     }
 </style>
+

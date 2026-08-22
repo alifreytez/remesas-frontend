@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     let {
         label = '',
         placeholder = '',
@@ -53,3 +53,4 @@
         cursor: not-allowed;
     }
 </style>
+

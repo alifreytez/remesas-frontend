@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { goto } from '$app/navigation';
 	import { auth } from '$lib/stores/auth.svelte';
 	import { USER_TYPES } from '$lib/constants/auth';
@@ -169,3 +169,4 @@
 		font-size: 14px;
 	}
 </style>
+

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import Badge from './Badge.svelte';
     import { ArrowRight } from 'lucide-svelte';
 
@@ -173,3 +173,4 @@
         border-color: var(--accent-purple);
     }
 </style>
+

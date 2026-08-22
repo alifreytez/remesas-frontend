@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import PageTitle from './PageTitle.svelte';
     let { title = 'Inicio' } = $props();
 </script>
@@ -15,3 +15,4 @@
         align-items: center;
     }
 </style>
+

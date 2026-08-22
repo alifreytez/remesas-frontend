@@ -1,108 +1,158 @@
 <script lang="ts">
     import { setHeader } from '$lib/stores/header.svelte';
     import Section from '$lib/components/layout/Section.svelte';
+    import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
     import Table from '$lib/components/ui/Table.svelte';
+    import { auth } from '$lib/stores/auth.svelte';
+    import { fly } from 'svelte/transition';
+    import { onMount } from 'svelte';
+    import { api } from '$lib/utils/api';
 
     import PermissionGuard from '$lib/components/auth/PermissionGuard.svelte';
     import { FileSearch } from 'lucide-svelte';
+    import RemittanceDetail from '$lib/components/admin/RemittanceDetail.svelte';
     
     $effect(() => {
-        setHeader('Bandeja de Remesas', false, '', null);
+        setHeader('Remesas', false, '', null);
         return () => {
             setHeader('', false, '', null);
         };
     });
 
+    let currentView = $state<'list' | 'detail'>('list');
+    let selectedRemittance = $state<any>(null);
 
+    let remittances = $state<any[]>([]);
+    let loading = $state(true);
 
     const tableColumns = [
         { key: 'solicitud', label: 'Solicitud', filterType: 'text' as const },
         { key: 'fecha', label: 'Fecha', filterType: 'dateRange' as const },
         { key: 'cliente', label: 'Cliente', filterType: 'text' as const },
-        { key: 'origen', label: 'Origen', filterType: 'select' as const, filterOptions: [
-            { label: 'Todos', value: '' },
-            { label: 'Chile', value: 'Chile' },
-            { label: 'Perú', value: 'Perú' }
-        ] },
-        { key: 'estado', label: 'Estado', format: 'badge' as const, width: '1%', filterType: 'select' as const, filterOptions: [
+        { key: 'origen', label: 'Origen', filterType: 'text' as const },
+        { key: 'estado', label: 'Estado', format: 'status' as const, width: '150px', filterType: 'select' as const, filterOptions: [
             { label: 'Todos', value: '' },
             { label: 'PENDING', value: 'PENDING' },
             { label: 'APPROVED', value: 'APPROVED' },
             { label: 'REJECTED', value: 'REJECTED' }
-        ], badgeMap: {
-            'PENDING': 'warning',
-            'APPROVED': 'success',
-            'REJECTED': 'danger'
-        } as Record<string, "info" | "success" | "warning" | "danger"> }
+        ] }
     ];
 
-    const mockData = [
-        { solicitud: '#106', fecha: '2026-08-08', cliente: 'Ali Freytez', origen: 'Chile', estado: 'PENDING' },
-        { solicitud: '#107', fecha: '2026-08-08', cliente: 'Maria Paz', origen: 'Perú', estado: 'PENDING' }
-    ];
+    async function fetchRemittances(filters: Record<string, any> = {}) {
+        try {
+            loading = true;
+            let query = new URLSearchParams();
+            if (filters.estado) query.append('filters[status]', filters.estado);
+            if (filters.solicitud) query.append('filters[id]', filters.solicitud);
+            
+            const response = await api.get<{data: {rows: any[]}}>(`/remittances?${query.toString()}`);
+            const rawData = response.data?.rows || (Array.isArray(response.data) ? response.data : []);
+            
+            remittances = rawData.map((r: any) => ({
+                id: r.id,
+                solicitud: `#${r.id}`,
+                fecha: new Date(r.createdAt).toISOString().split('T')[0],
+                cliente: r._Client?._Person ? `${r._Client._Person.firstName} ${r._Client._Person.lastName}` : 'Desconocido',
+                origen: r._OriginCountry?.name || 'Desconocido',
+                estado: r.status
+            }));
+        } catch (error) {
+            console.error('Error fetching remittances:', error);
+            remittances = [];
+        } finally {
+            loading = false;
+        }
+    }
+
+    onMount(() => {
+        fetchRemittances();
+    });
 
     function handleFilterChange(filters: Record<string, any>) {
-        console.log('Filters changed:', filters);
-        // Here you would typically fetch data from the server using these filters
+        fetchRemittances(filters);
+    }
+
+    function openDetail(row: any) {
+        selectedRemittance = row;
+        currentView = 'detail';
+    }
+
+    function closeDetail() {
+        currentView = 'list';
+        selectedRemittance = null;
+        fetchRemittances(); // Refrescar por si hubo cambios de estado
     }
 </script>
 
-<div class="remittances-container">
-    <PermissionGuard permission="UI:VIEW:REMITTANCES">
-        <Section>
-            
-
-
-            <div class="table-container">
-                <Table 
-                    columns={tableColumns} 
-                    data={mockData} 
-                    hasActions={true}
-                    variant="v2"
-                    onfilter={handleFilterChange}
-                >
-                    {#snippet actions(row)}
-                        <div class="actions-col">
-                            <button class="icon-btn" title="Auditar Remesa">
-                                <FileSearch size={18} />
-                            </button>
-                        </div>
-                    {/snippet}
-                </Table>
-            </div>
-
-        </Section>
-    </PermissionGuard>
+<div class="view-slider-container">
+    {#if currentView === 'detail' && selectedRemittance}
+        <div class="slide-view" in:fly={{ x: 50, duration: 300 }} out:fly={{ x: 50, duration: 300 }}>
+            <Section>
+                <SectionTitle 
+                    title={`Detalle de Solicitud ${selectedRemittance.solicitud}`}
+                    onBack={closeDetail}
+                />
+                
+                <!-- Aquí iría el componente real que fetch del ID. Por ahora le pasamos el ID o el objeto -->
+                <RemittanceDetail remittanceId={selectedRemittance.id} onStatusChange={closeDetail} />
+            </Section>
+        </div>
+    {:else}
+        <div class="slide-view" in:fly={{ x: -50, duration: 300 }} out:fly={{ x: -50, duration: 300 }}>
+            <Section>
+                <SectionTitle title="Todas las Solicitudes" subtitle="Gestiona y aprueba envíos de dinero" />
+                
+                {#if loading}
+                    <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                        Cargando remesas...
+                    </div>
+                {:else}
+                    <Table 
+                        columns={tableColumns} 
+                        data={remittances} 
+                        variant="v2"
+                        onFilterChange={handleFilterChange}
+                        hasActions={true}
+                    >
+                        {#snippet actions(row)}
+                            <PermissionGuard permission="REMITTANCES:VIEW_DETAIL">
+                                <button type="button" class="action-btn" title="Ver Detalles" onclick={() => openDetail(row)}>
+                                    <FileSearch size={16} />
+                                </button>
+                            </PermissionGuard>
+                        {/snippet}
+                    </Table>
+                {/if}
+            </Section>
+        </div>
+    {/if}
 </div>
 
 <style>
-    .remittances-container {
-        max-width: 1400px;
+    .view-slider-container {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
     }
-
-
-
-    .actions-col {
-        display: flex;
-        gap: 8px;
-        justify-content: center;
+    .slide-view {
+        grid-area: 1 / 1;
+        width: 100%;
+        min-width: 0;
     }
-
-    .icon-btn {
-        background: none;
+    
+    .action-btn {
+        background: transparent;
         border: none;
+        color: var(--gray-500);
         cursor: pointer;
-        color: var(--gray-600);
         padding: 4px;
-        border-radius: 4px;
-        display: flex;
+        border-radius: var(--radius-sm);
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        transition: color 0.2s, background-color 0.2s;
+        transition: all 0.2s;
     }
-
-    .icon-btn:hover {
-        color: var(--accent-purple, #6d28d9);
-        background-color: var(--gray-100);
+    .action-btn:hover {
+        color: var(--primary-600);
+        background-color: var(--primary-50);
     }
 </style>

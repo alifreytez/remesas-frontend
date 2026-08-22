@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { onMount } from 'svelte';
     import { auth } from '$lib/stores/auth.svelte';
     import { USER_TYPES } from '$lib/constants/auth';
@@ -58,3 +58,4 @@
         }
     }
 </style>
+

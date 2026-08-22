@@ -2,6 +2,7 @@
     import { goto } from '$app/navigation';
     import { ArrowLeft, CheckCircle, Upload, Building, Landmark, Wallet } from 'lucide-svelte';
     import Section from '$lib/components/layout/Section.svelte';
+    import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
     
     import StepContact from './components/StepContact.svelte';
     import StepCalculator from './components/StepCalculator.svelte';
@@ -9,6 +10,9 @@
     import StepSuccess from './components/StepSuccess.svelte';
 
     import { setHeader } from '$lib/stores/header.svelte';
+
+    import { api } from '$lib/utils/api';
+    import { onMount } from 'svelte';
 
     let currentStep = $state(1);
     
@@ -31,20 +35,30 @@
         };
     });
 
-    // Mock Data for Steps
-    let contacts = [
-        { 
-            id: '1', name: 'Juan Pérez', country: 'Venezuela', document: 'V-12345678',
-            bankDetails: [
-                { id: '1', method: 'pago_movil', bank: 'Banesco', document: 'V-12345678', phone: '04121234567' },
-                { id: '2', method: 'transferencia', bank: 'Mercantil', accountNumber: '01050000000000000000', accountType: 'corriente', document: 'V-12345678' }
-            ]
-        },
-        { 
-            id: '2', name: 'Maria Gomez', country: 'Colombia', document: 'V-87654321',
-            bankDetails: []
+    let contacts = $state<any[]>([]);
+    let paymentMethods = $state<any[]>([]);
+    let platformAccounts = $state<any[]>([]);
+    let clientData = $state<any>(null);
+    let countries = $state<any[]>([]);
+    let isLoading = $state(true);
+
+    onMount(async () => {
+        try {
+            const res = await api.get<{ data: any }>('/remittances/options');
+            contacts = res.data.contacts || [];
+            paymentMethods = res.data.paymentMethods || [];
+            platformAccounts = res.data.platformAccounts || [];
+            clientData = res.data.client || null;
+            countries = res.data.countries || [];
+            if (platformAccounts.length > 0) {
+                selectedPlatformAccountId = platformAccounts[0].id.toString();
+            }
+        } catch (error) {
+            console.error('Error fetching remittance options:', error);
+        } finally {
+            isLoading = false;
         }
-    ];
+    });
 
     // Form State
     let recipientData = $state({
@@ -54,50 +68,114 @@
         lastName: '',
         document: '',
         country: '',
-        method: 'pago_movil',
+        method: '',
         bank: '',
         accountNumber: '',
         phone: '',
         bankDocument: ''
     });
+
+    let selectedPlatformAccountId = $state('');
     let sendAmount = $state('');
-    let selectedRateId = $state('1');
 
-    let rates = [
-        { 
-            id: '1', 
-            label: 'Perú a Venezuela (PEN a VES)', 
-            rate: 11.2,
-            originCurrency: { code: 'PEN', symbol: 'S/' },
-            destinationCurrency: { code: 'VES', symbol: 'Bs' }
-        },
-        { 
-            id: '2', 
-            label: 'Chile a Venezuela (CLP a VES)', 
-            rate: 0.045,
-            originCurrency: { code: 'CLP', symbol: '$' },
-            destinationCurrency: { code: 'VES', symbol: 'Bs' }
-        },
-        { 
-            id: '3', 
-            label: 'USA a Venezuela (USD a VES)', 
-            rate: 42.5,
-            originCurrency: { code: 'USD', symbol: '$' },
-            destinationCurrency: { code: 'VES', symbol: 'Bs' }
+    let selectedPlatformAccount = $derived(
+        platformAccounts.find(acc => acc.id == selectedPlatformAccountId) || platformAccounts[0]
+    );
+
+    let originCurrency = $derived(selectedPlatformAccount?.currency || { code: '', symbol: '' });
+
+    // Deducir moneda destino según el método seleccionado en el Paso 1
+    let destinationMethod = $derived(
+        paymentMethods.find(m => m.type_code === recipientData.method)
+    );
+    let destinationCurrency = $derived(
+        destinationMethod?.is_global ? { code: 'USD', symbol: '$', id: 1 } : { code: 'VES', symbol: 'Bs', id: 2 } // Mock IDs si no vienen
+    );
+
+    // Quote Data del Backend
+    let quoteData = $state({
+        amountReceived: '0.00',
+        totalFees: '0.00',
+        amountToPay: '0.00',
+        exchangeRateValue: 1,
+        isLoading: false
+    });
+
+    let debounceTimer: any;
+    
+    $effect(() => {
+        // Trigger fetchQuote when sendAmount or selectedPlatformAccountId changes
+        if (sendAmount && selectedPlatformAccountId && destinationCurrency) {
+            clearTimeout(debounceTimer);
+            quoteData.isLoading = true;
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const res = await api.post<{ data: any }>('/remittances/quote', {
+                        amount: Number(sendAmount),
+                        originCurrency: selectedPlatformAccount?.currency?.id || 1, // Fallback safe
+                        destinationCurrency: destinationCurrency.id || 2, // Fallback safe
+                        originCountry: clientData?.originCountry || 2, // Usando data real del cliente (ideal pasarlo desde res.data.client.originCountry)
+                        destinationCountry: 1, // Ej Venezuela
+                        paymentMethod: destinationMethod?.id
+                    });
+                    
+                    const q = res.data;
+                    quoteData.amountReceived = Number(q.amountReceived).toFixed(2);
+                    quoteData.totalFees = Number(q.totalFees).toFixed(2);
+                    quoteData.amountToPay = Number(q.amountToPay).toFixed(2);
+                    quoteData.exchangeRateValue = q.exchangeRateValue;
+                } catch (error) {
+                    console.error('Error fetching quote:', error);
+                } finally {
+                    quoteData.isLoading = false;
+                }
+            }, 500); // 500ms debounce
+        } else {
+            quoteData.amountReceived = '0.00';
+            quoteData.totalFees = '0.00';
+            quoteData.amountToPay = '0.00';
+            quoteData.exchangeRateValue = 1;
         }
-    ];
+    });
 
-    let selectedRate = $derived(rates.find(r => r.id === selectedRateId) || rates[0]);
+    let selectedRate = $derived({
+        originCurrency,
+        destinationCurrency,
+        rate: quoteData.exchangeRateValue
+    });
 
-    let receivedAmount = $derived(
-        sendAmount ? (Number(sendAmount) * selectedRate.rate).toFixed(2) : '0.00'
-    );
-    let commissionAmount = $derived(
-        sendAmount ? (Number(sendAmount) * 0.05).toFixed(2) : '0.00'
-    );
-    let totalToPay = $derived(
-        sendAmount ? (Number(sendAmount) + Number(commissionAmount)).toFixed(2) : '0.00'
-    );
+    let isSubmitting = $state(false);
+
+    async function submitRemittance() {
+        if (isSubmitting) return;
+        isSubmitting = true;
+        try {
+            // Preparar el recipientAccountDetails en base al fields_config
+            let details: Record<string, string> = { method: recipientData.method };
+            const methodDef = paymentMethods.find(m => m.type_code === recipientData.method);
+            if (methodDef) {
+                methodDef.fields_config.forEach((f: any) => {
+                    details[f.name] = recipientData[f.name];
+                });
+            }
+
+            await api.post('/remittances', {
+                destinationCountry: Number(recipientData.country),
+                platformBankAccount: Number(selectedPlatformAccountId),
+                amountSent: Number(sendAmount),
+                recipientAccountDetails: details,
+                // Si tienes un save_contact para el backend:
+                saveContact: recipientData.saveAsContact,
+                contactName: `${recipientData.firstName} ${recipientData.lastName}`
+            });
+            nextStep();
+        } catch (error) {
+            console.error('Error al crear la remesa:', error);
+            // ideal mostrar un toast de error aquí
+        } finally {
+            isSubmitting = false;
+        }
+    }
 
     function nextStep() {
         if (currentStep < 5) currentStep++;
@@ -137,18 +215,22 @@
         <Section class="form-section">
             {#if currentStep === 1}
                 <StepContact 
-                    {contacts} 
+                    {contacts}
+                    {paymentMethods}
+                    {countries}
                     bind:recipientData
                     {nextStep} 
                 />
             {:else if currentStep === 2}
                 <StepCalculator 
-                    {rates} 
-                    bind:selectedRateId 
+                    {platformAccounts} 
+                    {paymentMethods}
+                    bind:selectedPlatformAccountId 
                     bind:sendAmount 
-                    {commissionAmount}
-                    {receivedAmount}
-                    {totalToPay}
+                    commissionAmount={quoteData.totalFees}
+                    receivedAmount={quoteData.amountReceived}
+                    totalToPay={quoteData.amountToPay}
+                    isLoading={quoteData.isLoading}
                     {selectedRate}
                     {prevStep}
                     {nextStep} 
@@ -156,13 +238,16 @@
             {:else if currentStep === 3}
                 <StepSummary 
                     {sendAmount}
-                    {commissionAmount}
-                    {receivedAmount}
-                    {totalToPay}
+                    commissionAmount={quoteData.totalFees}
+                    receivedAmount={quoteData.amountReceived}
+                    totalToPay={quoteData.amountToPay}
                     {recipientData}
                     {selectedRate}
+                    {paymentMethods}
+                    {countries}
+                    {isSubmitting}
                     {prevStep}
-                    {nextStep} 
+                    submitFn={submitRemittance} 
                 />
             {:else if currentStep === 4}
                 <StepSuccess 
@@ -172,12 +257,11 @@
             {/if}
         </Section>
 
-        <!-- Guide Panel (Right Column) -->
         <div class="guide-panel-container desktop-only">
             <Section class="guide-section">
                 {#if currentStep === 1}
+                    <SectionTitle title="Guía: Destinatario" />
                     <div class="guide-content">
-                        <h3>Guía: Destinatario</h3>
                         <p>Seleccione o registre a la persona que recibirá el dinero.</p>
                         <ul>
                             <li><strong>Desde Directorio:</strong> Elija un contacto y cuenta previamente guardados para mayor rapidez.</li>
@@ -186,8 +270,8 @@
                         <p class="guide-note">Asegúrese de que los datos bancarios coincidan exactamente con la identidad del titular de la cuenta para evitar rechazos bancarios.</p>
                     </div>
                 {:else if currentStep === 2}
+                    <SectionTitle title="Guía: Montos y Tasas" />
                     <div class="guide-content">
-                        <h3>Guía: Montos y Tasas</h3>
                         <p>Calcule exactamente cuánto dinero se enviará y cuánto recibirá su destinatario.</p>
                         <ul>
                             <li><strong>Tasa de cambio:</strong> Se actualiza en tiempo real según el mercado.</li>
@@ -195,14 +279,14 @@
                         </ul>
                     </div>
                 {:else if currentStep === 3}
+                    <SectionTitle title="Guía: Verificación" />
                     <div class="guide-content">
-                        <h3>Guía: Verificación</h3>
                         <p>Revise detalladamente el resumen antes de proceder al pago.</p>
                         <p class="guide-note">Una vez confirmada la operación, pasará a validación por nuestro equipo de finanzas.</p>
                     </div>
                 {:else if currentStep === 4}
+                    <SectionTitle title="¡Felicidades!" />
                     <div class="guide-content">
-                        <h3>¡Felicidades!</h3>
                         <p>Su proceso de registro ha terminado. Ahora puede consultar el estado en su historial.</p>
                     </div>
                 {/if}
@@ -215,41 +299,8 @@
     .remittance-flow {
         display: flex;
         flex-direction: column;
-        gap: 24px;
-        padding-top: 16px;
+        gap: var(--spacing-6);
         width: 100%;
-    }
-
-    .header-section {
-        display: flex;
-        flex-direction: row;
-        gap: 16px;
-        align-items: center;
-    }
-
-    .back-button {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: transparent;
-        border: none;
-        color: var(--gray-500);
-        font-weight: 500;
-        cursor: pointer;
-        padding: 0;
-        font-size: 14px;
-        transition: color 0.2s;
-    }
-
-    .back-button:hover {
-        color: var(--gray-900);
-    }
-
-    .page-title {
-        font-size: 24px;
-        font-weight: 700;
-        color: var(--gray-900);
-        margin: 0;
     }
 
     /* Stepper */
@@ -257,8 +308,8 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        margin: 16px 0 24px;
-        padding: 0 16px;
+        margin: var(--spacing-4) 0 var(--spacing-6);
+        padding: 0 var(--spacing-4);
     }
 
     .step-item {
@@ -272,8 +323,8 @@
     }
 
     .step-circle {
-        width: 32px;
-        height: 32px;
+        width: var(--spacing-8);
+        height: var(--spacing-8);
         border-radius: 50%;
         background-color: var(--gray-200);
         color: var(--gray-500);
@@ -281,22 +332,22 @@
         align-items: center;
         justify-content: center;
         font-weight: 600;
-        font-size: 14px;
-        transition: all 0.3s;
+        font-size: var(--text-sm);
+        transition: all var(--transition-fast);
         flex-shrink: 0;
     }
 
     .step-item.active .step-circle {
         background-color: var(--primary-600);
-        color: white;
+        color: var(--white);
     }
 
     .step-line {
         flex: 1;
         height: 2px;
         background-color: var(--gray-200);
-        margin: 0 8px;
-        transition: all 0.3s;
+        margin: 0 var(--spacing-2);
+        transition: all var(--transition-fast);
     }
 
     .active-line {
@@ -307,7 +358,7 @@
     .new-remittance-layout {
         display: grid;
         grid-template-columns: 1fr;
-        gap: 24px;
+        gap: var(--spacing-6);
         align-items: start;
     }
 
@@ -319,45 +370,37 @@
 
     .guide-panel-container {
         position: sticky;
-        top: 24px;
-    }
-
-    .guide-content h3 {
-        margin-top: 0;
-        margin-bottom: 16px;
-        font-size: 18px;
-        color: var(--gray-900);
-        font-weight: 700;
+        top: var(--spacing-6);
     }
 
     .guide-content p {
-        font-size: 14px;
+        font-size: var(--text-sm);
         color: var(--gray-600);
         line-height: 1.5;
-        margin-bottom: 12px;
+        margin-bottom: var(--spacing-3);
     }
 
     .guide-content ul {
-        padding-left: 20px;
-        margin-bottom: 16px;
+        padding-left: var(--spacing-6);
+        margin-bottom: var(--spacing-4);
     }
 
     .guide-content li {
-        font-size: 14px;
+        font-size: var(--text-sm);
         color: var(--gray-600);
-        margin-bottom: 8px;
+        margin-bottom: var(--spacing-2);
         line-height: 1.5;
     }
 
     .guide-note {
-        padding: 12px 16px;
-        background-color: #eff6ff; /* light blue */
-        border-radius: 8px;
+        padding: var(--spacing-3) var(--spacing-4);
+        background-color: var(--gray-50);
+        border-radius: var(--radius-lg);
         border-left: 4px solid var(--primary-600);
-        font-size: 13px !important;
-        color: var(--gray-800) !important;
-        margin-top: 24px;
-        margin-bottom: 0 !important;
+        font-size: var(--text-xs);
+        color: var(--gray-800);
+        margin-top: var(--spacing-6);
+        margin-bottom: 0;
     }
 
     @media (max-width: 1023px) {
@@ -366,3 +409,4 @@
         }
     }
 </style>
+

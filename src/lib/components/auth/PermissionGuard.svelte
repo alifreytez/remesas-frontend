@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { auth } from '$lib/stores/auth.svelte';
     import type { Snippet } from 'svelte';
     
@@ -58,3 +58,4 @@
 {#if hasAccess}
     {@render children?.()}
 {/if}
+

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     let { children } = $props();
 </script>
 
@@ -14,3 +14,4 @@
         flex-direction: column;
     }
 </style>
+

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import type { Snippet } from 'svelte';
     let {
         label = '',
@@ -211,3 +211,4 @@
         cursor: not-allowed;
     }
 </style>
+

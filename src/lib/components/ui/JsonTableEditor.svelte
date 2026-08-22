@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import TableIcon from 'lucide-svelte/icons/table';
     import LayoutList from 'lucide-svelte/icons/layout-list';
     import Plus from 'lucide-svelte/icons/plus';
@@ -246,7 +246,7 @@
         </div>
         <div class="toolbar-actions">
             {#if isArrayMode}
-                <Button variant="outline" class="toolbar-btn" onclick={addColumn} {disabled}>
+                <Button variant="secondary" class="toolbar-btn" onclick={addColumn} {disabled}>
                     <Columns size={14} /> Añadir Columna
                 </Button>
                 <Button variant="primary" class="toolbar-btn" onclick={addRow} {disabled}>
@@ -398,7 +398,7 @@
     
     {#if !isRoot}
         <div class="sub-editor-actions">
-            <Button variant="outline" onclick={() => onClose && onClose(undefined, true)}>
+            <Button variant="secondary" onclick={() => onClose && onClose(undefined, true)}>
                 Cancelar
             </Button>
             <Button variant="primary" onclick={() => onClose && onClose(internalValue, false)}>
@@ -440,7 +440,7 @@
             <div class="modal-body confirm-body">
                 <p>{confirmModal.message}</p>
                 <div class="modal-footer">
-                    <Button variant="outline" onclick={() => closeConfirm(false)}>Cancelar</Button>
+                    <Button variant="secondary" onclick={() => closeConfirm(false)}>Cancelar</Button>
                     <Button variant="primary" onclick={() => closeConfirm(true)}>Aceptar</Button>
                 </div>
             </div>
@@ -464,7 +464,7 @@
                     onkeydown={(e) => e.key === 'Enter' && closePrompt(true)}
                 />
                 <div class="modal-footer">
-                    <Button variant="outline" onclick={() => closePrompt(false)}>Cancelar</Button>
+                    <Button variant="secondary" onclick={() => closePrompt(false)}>Cancelar</Button>
                     <Button variant="primary" onclick={() => closePrompt(true)}>Aceptar</Button>
                 </div>
             </div>
@@ -817,3 +817,4 @@
         margin-top: 8px;
     }
 </style>
+

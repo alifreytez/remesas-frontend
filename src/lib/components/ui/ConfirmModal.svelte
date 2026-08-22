@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { fade, scale } from 'svelte/transition';
     import { confirmStore } from '$lib/stores/confirm.svelte';
     import { AlertTriangle, AlertCircle, Info, CheckCircle2 } from 'lucide-svelte';
@@ -165,3 +165,4 @@
         flex: 1;
     }
 </style>
+

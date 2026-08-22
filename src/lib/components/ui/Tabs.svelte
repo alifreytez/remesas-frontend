@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     let {
         tabs = [],
         activeTab = $bindable(0)
@@ -59,3 +59,4 @@
         color: white;
     }
 </style>
+

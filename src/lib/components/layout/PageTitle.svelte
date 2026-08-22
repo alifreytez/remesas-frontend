@@ -1,7 +1,8 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { headerState } from '$lib/stores/header.svelte';
     import { ArrowLeft } from 'lucide-svelte';
     import { goto } from '$app/navigation';
+    import StatusBadge from '../ui/StatusBadge.svelte';
     
     let { title = '' } = $props();
 
@@ -21,6 +22,11 @@
         </button>
     {/if}
     <h1 class="page-title">{title}</h1>
+    {#if headerState.badge}
+        <div class="header-badge">
+            <StatusBadge status={headerState.badge.text} />
+        </div>
+    {/if}
 </div>
 
 <style>
@@ -28,6 +34,12 @@
         display: flex;
         align-items: center;
         gap: 12px;
+    }
+
+    .header-badge {
+        margin-left: 8px;
+        display: flex;
+        align-items: center;
     }
     
     .back-button {
@@ -57,3 +69,4 @@
         letter-spacing: -0.5px;
     }
 </style>
+

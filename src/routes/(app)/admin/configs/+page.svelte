@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { setHeader } from '$lib/stores/header.svelte';
     import PermissionGuard from '$lib/components/auth/PermissionGuard.svelte';
     import { auth } from '$lib/stores/auth.svelte';
@@ -95,7 +95,7 @@
                 
                 tableData = rows.map((r: any) => ({
                     ...r,
-                    __estado_registro: !(r.deletedAt || r.deleted_at) ? 'Activo' : 'Eliminado'
+                    __estado_registro: !(r.deletedAt || r.deleted_at) ? 'ACTIVO' : 'INACTIVO'
                 }));
             } catch (err) {
                 console.error(err);
@@ -150,15 +150,15 @@
             filterType: 'select',
             format: 'badge',
             badgeMap: {
-                'Activo': 'success',
-                'Eliminado': 'danger'
+                'ACTIVO': 'success',
+                'INACTIVO': 'danger'
             },
             width: '150px',
             align: 'center',
             filterOptions: [
                 { value: '', label: 'Todos' },
-                { value: 'Activo', label: 'Activos' },
-                { value: 'Eliminado', label: 'Eliminados' }
+                { value: 'ACTIVO', label: 'ACTIVO' },
+                { value: 'INACTIVO', label: 'INACTIVO' }
             ]
         });
 
@@ -188,44 +188,37 @@
         if (action === 'restore') {
             const isConfirmed = await confirm({
                 title: 'Restaurar registro',
-                message: '¿Estás seguro de restaurar este registro?',
-                confirmText: 'Sí, restaurar',
-                cancelText: 'Cancelar',
-                type: 'warning'
+                message: '¿Estás seguro de que deseas restaurar este registro de configuración?',
+                type: 'info'
             });
-
-            if (!isConfirmed) return;
-
-            try {
-                await api.patch(`/catalogs/${configState.selectedCatalog}/${row.id}/restore`);
-                row.deletedAt = null;
-                row.__estado_registro = 'Activo';
-                tableData = [...tableData];
-            } catch (e: any) {
-                console.error(e);
-                const apiMsg = e.response?.data?.message || e.message || 'Error al restaurar';
-                alertMsg(apiMsg, 'danger', 'Error');
+            if (isConfirmed) {
+                try {
+                    await api.patch(`/catalogs/${configState.selectedCatalog}/${row.id}/restore`);
+                    row.deletedAt = null;
+                    row.__estado_registro = 'ACTIVO';
+                    tableData = [...tableData];
+                } catch (e: any) {
+                    console.error(e);
+                    alertMsg('Error al restaurar el registro', 'danger');
+                }
             }
-        } else if (action === 'delete') {
+        } else {
             const isConfirmed = await confirm({
                 title: 'Eliminar registro',
-                message: '¿Estás seguro de eliminar este registro?',
-                confirmText: 'Sí, eliminar',
-                cancelText: 'Cancelar',
+                message: '¿Estás seguro de que deseas desactivar este registro de configuración?',
                 type: 'danger'
             });
-
-            if (!isConfirmed) return;
-
-            try {
-                await api.delete(`/catalogs/${configState.selectedCatalog}/${row.id}`);
-                row.deletedAt = new Date().toISOString();
-                row.__estado_registro = 'Eliminado';
-                tableData = [...tableData];
-            } catch (e: any) {
-                console.error(e);
-                const apiMsg = e.response?.data?.message || e.message || 'Error al eliminar';
-                alertMsg(apiMsg, 'danger', 'Error');
+            if (isConfirmed) {
+                try {
+                    await api.delete(`/catalogs/${configState.selectedCatalog}/${row.id}`);
+                    row.deletedAt = new Date().toISOString();
+                    row.__estado_registro = 'INACTIVO';
+                    tableData = [...tableData];
+                } catch (e: any) {
+                    console.error(e);
+                    const apiMsg = e.response?.data?.message || e.message || 'Error al eliminar';
+                    alertMsg(apiMsg, 'danger', 'Error');
+                }
             }
         }
     };
@@ -296,7 +289,7 @@
                         {#snippet actions(row)}
                             <div class="actions-group">
                                   <PermissionGuard permission="UI:UPDATE:CONFIGS">
-                                      {#if row.__estado_registro === 'Activo'}
+                                      {#if row.__estado_registro === 'ACTIVO'}
                                           <button class="action-btn edit" onclick={() => handleEdit(row)} title="Editar"><Edit2 size={16} /></button>
                                           <button class="action-btn delete" onclick={() => handleStatusChange(row, 'delete')} title="Eliminar"><Trash2 size={16} /></button>
                                       {:else}
@@ -396,3 +389,4 @@
         background: var(--warning-50);
     }
 </style>
+

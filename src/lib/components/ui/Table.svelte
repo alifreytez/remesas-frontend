@@ -1,8 +1,9 @@
-<script lang="ts">
+﻿<script lang="ts">
     import type { Snippet } from 'svelte';
     import { onMount, onDestroy } from 'svelte';
     import { Edit2, Eye, Info } from 'lucide-svelte';
     import Badge from './Badge.svelte';
+    import StatusBadge from './StatusBadge.svelte';
     import Switch from './Switch.svelte';
     import Select from './Select.svelte';
     import Pagination from './Pagination.svelte';
@@ -25,7 +26,7 @@
             filterType?: 'text' | 'select' | 'date' | 'dateRange';
             filterOptions?: Array<{value: string, label: string}>;
             filterProps?: Record<string, any>;
-            format?: 'text' | 'currency' | 'switch' | 'badge' | 'relation' | 'json';
+            format?: 'text' | 'currency' | 'switch' | 'badge' | 'status' | 'relation' | 'json';
             currencyCode?: string;
             currencyKey?: string;
             badgeMap?: Record<string, 'info' | 'success' | 'warning' | 'danger'>;
@@ -279,6 +280,8 @@
                                             text={row[col.key]} 
                                             variant={col.badgeMap ? (col.badgeMap[row[col.key]] || 'info') : 'info'} 
                                         />
+                                    {:else if col.format === 'status'}
+                                        <StatusBadge status={row[col.key]} />
                                     {:else if col.format === 'switch'}
                                         <Switch 
                                             checked={row[col.key]} 
@@ -556,3 +559,4 @@
         background-color: var(--bg-primary);
     }
 </style>
+

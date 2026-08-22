@@ -4,7 +4,6 @@
     import Grid from '$lib/components/ui/Grid.svelte';
     import Stack from '$lib/components/ui/Stack.svelte';
     import SectionAccordion from '$lib/components/ui/SectionAccordion.svelte';
-    import { methodsConfig } from '$lib/data/methodsConfig';
     
     let { 
         sendAmount,
@@ -13,8 +12,11 @@
         totalToPay,
         recipientData,
         selectedRate,
+        paymentMethods,
+        countries,
+        isSubmitting = false,
         prevStep,
-        nextStep 
+        submitFn 
     }: {
         sendAmount: string;
         commissionAmount: string;
@@ -22,12 +24,19 @@
         totalToPay: string;
         recipientData: any;
         selectedRate: any;
+        paymentMethods: any[];
+        countries: any[];
+        isSubmitting?: boolean;
         prevStep: () => void;
-        nextStep: () => void;
+        submitFn: () => void;
     } = $props();
 
     let methodDisplay = $derived(
-        methodsConfig[recipientData.method]?.name || 'Transferencia Bancaria'
+        paymentMethods.find(m => m.type_code === recipientData.method)?.name || 'Transferencia Bancaria'
+    );
+
+    let countryDisplay = $derived(
+        countries.find(c => c.id == recipientData.country)?.name || 'Desconocido'
     );
 </script>
 
@@ -46,12 +55,8 @@
                         <span class="value">{recipientData.firstName} {recipientData.lastName}</span>
                     </div>
                     <div class="detail-row">
-                        <span class="label">Documento:</span>
-                        <span class="value">{recipientData.document}</span>
-                    </div>
-                    <div class="detail-row">
                         <span class="label">País:</span>
-                        <span class="value">{recipientData.country === '1' ? 'Venezuela' : 'Otro'}</span>
+                        <span class="value">{countryDisplay}</span>
                     </div>
                 </div>
             </SectionAccordion>
@@ -98,11 +103,11 @@
     </Stack>
 
     <div class="actions">
-        <Button variant="outline" type="button" onclick={prevStep}>
+        <Button variant="secondary" type="button" onclick={prevStep}>
             Atrás
         </Button>
-        <Button variant="primary" onclick={nextStep}>
-            Confirmar y Pagar <ArrowRight size={16} />
+        <Button variant="primary" onclick={submitFn} disabled={isSubmitting}>
+            {isSubmitting ? 'Procesando...' : 'Confirmar y Pagar'} <ArrowRight size={16} />
         </Button>
     </div>
 </div>
@@ -206,3 +211,4 @@
         padding-top: var(--spacing-6);
     }
 </style>
+

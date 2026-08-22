@@ -12,6 +12,7 @@
     import SectionGrid from '$lib/components/layout/SectionGrid.svelte';
     import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
     import TransactionCard from '$lib/components/ui/TransactionCard.svelte';
+    import { setHeader } from '$lib/stores/header.svelte';
 
     let loadingRates = $state(false);
     let rates = $state<any[]>([]);
@@ -19,48 +20,90 @@
     // Calculator State
     let selectedRateId = $state('');
     let sendAmount = $state('');
+
+    let recentRemittances = $state<any[]>([]);
+    let stats = $state({
+        total: 0,
+        approved: 0,
+        pending: 0,
+        rejected: 0
+    });
+
+    $effect(() => {
+        setHeader('Resumen de Cuenta', false, '', null);
+        return () => setHeader('', false, '', null);
+    });
     
     let selectedRate = $derived(rates.find(r => r.id === Number(selectedRateId)));
-    let receivedAmount = $derived(
-        sendAmount && selectedRate 
-            ? (Number(sendAmount) * Number(selectedRate.rate)).toFixed(2) 
-            : '0.00'
-    );
-    let commissionAmount = $derived(
-        sendAmount ? (Number(sendAmount) * 0.05).toFixed(2) : '0.00'
-    );
-    let totalToPay = $derived(
-        sendAmount ? (Number(sendAmount) + Number(commissionAmount)).toFixed(2) : '0.00'
-    );
+    
+    let quoteData = $state({
+        amountReceived: '0.00',
+        totalFees: '0.00',
+        amountToPay: '0.00',
+        exchangeRateValue: 1,
+        isLoading: false
+    });
 
-    // Updated Summary Data (4 Cards)
-    const summary = [
-        { label: 'Realizadas', value: '253', icon: Activity, color: 'var(--primary-600)' },
-        { label: 'Aprobadas', value: '240', icon: CheckCircle, color: 'var(--primary-600)' },
-        { label: 'Pendientes', value: '11', icon: Clock, color: 'var(--primary-600)' },
-        { label: 'Rechazadas', value: '2', icon: XCircle, color: 'var(--primary-600)' }
-    ];
+    let debounceTimer: ReturnType<typeof setTimeout>;
 
-    // Mock recent activity
-    const recentActivity = [
-        { id: 'RM-1029', date: 'Hoy, 07:29 am', amountPaid: '$150.00', amountReceived: 'Bs 6,375.00', status: 'Pendiente', destination: 'Venezuela' },
-        { id: 'RM-1028', date: 'Ayer, 07:16 am', amountPaid: '$340.01', amountReceived: 'COP 1,360,000', status: 'Aprobada', destination: 'Colombia' },
-        { id: 'RM-1027', date: '12 Jun, 3:12 pm', amountPaid: '$512.04', amountReceived: 'Bs 21,760.00', status: 'Aprobada', destination: 'Venezuela' },
-        { id: 'RM-1026', date: '11 Jun, 9:20 am', amountPaid: '$612.18', amountReceived: 'PEN 2,265.00', status: 'Rechazada', destination: 'Perú' }
-    ];
+    $effect(() => {
+        if (sendAmount && selectedRate) {
+            clearTimeout(debounceTimer);
+            quoteData.isLoading = true;
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const res = await api.post<{ data: any }>('/remittances/quote', {
+                        amount: Number(sendAmount),
+                        originCurrency: selectedRate._InitialCurrency?.id || 1, 
+                        destinationCurrency: selectedRate._SecondaryCurrency?.id || 2, 
+                        originCountry: selectedRate.initialCountry, 
+                        destinationCountry: selectedRate.secondaryCountry, 
+                        paymentMethod: null
+                    });
+                    
+                    const q = res.data;
+                    quoteData.amountReceived = Number(q.amountReceived).toFixed(2);
+                    quoteData.totalFees = Number(q.totalFees).toFixed(2);
+                    quoteData.amountToPay = Number(q.amountToPay).toFixed(2);
+                    quoteData.exchangeRateValue = q.exchangeRateValue;
+                } catch (error) {
+                    console.error('Error fetching quote:', error);
+                } finally {
+                    quoteData.isLoading = false;
+                }
+            }, 500); 
+        } else {
+            quoteData.amountReceived = '0.00';
+            quoteData.totalFees = '0.00';
+            quoteData.amountToPay = '0.00';
+            quoteData.exchangeRateValue = 1;
+        }
+    });
 
     onMount(async () => {
         try {
             loadingRates = true;
-            const res = await api.get<any>('/finances/rates');
-            if (res.success) {
-                rates = res.data;
-                if (rates.length > 0) {
-                    selectedRateId = rates[0].id.toString();
-                }
+            const res = await api.get<{data: any[]}>('/finances/rates');
+            rates = res.data || [];
+            if (rates.length > 0) {
+                selectedRateId = rates[0].id.toString();
             }
+
+            // Fetch user remittances for history and stats
+            const remRes = await api.get<{data: {rows: any[], count: number}}>('/remittances?limit=100');
+            const dataRows = remRes.data?.rows || (Array.isArray(remRes.data) ? remRes.data : []);
+            
+            recentRemittances = dataRows.slice(0, 4);
+
+            stats = {
+                total: remRes.data?.count || dataRows.length,
+                approved: dataRows.filter(r => r.status === 'APPROVED').length,
+                pending: dataRows.filter(r => r.status === 'PENDING' || r.status === 'PENDIENTE DE REVISION').length,
+                rejected: dataRows.filter(r => r.status === 'REJECTED').length
+            };
+
         } catch (error) {
-            console.error('Failed to load rates', error);
+            console.error('Failed to load data', error);
         } finally {
             loadingRates = false;
         }
@@ -74,372 +117,251 @@
     }
 </script>
 
-<div class="dashboard">
-    <!-- Top Row: KPIs -->
-    <div class="summary-grid">
-        {#each summary as item}
-            <Card padding="20px" class="kpi-card-custom">
-                <div class="kpi-header">
-                    <svelte:component this={item.icon} size={20} color={item.color} />
-                    <span class="kpi-label">{item.label}</span>
+<div class="dashboard-page">
+    <!-- Resumen de Actividad -->
+    <Section>
+        <SectionGrid cols={4} colsMd={2} colsSm={1} gap="var(--spacing-6)">
+            <Card padding="var(--spacing-6)" style="display: flex; align-items: center; gap: var(--spacing-4);">
+                <div class="stat-icon" style="background-color: var(--primary-50); color: var(--primary-600);">
+                    <Activity size={24} />
                 </div>
-                <div class="kpi-value">{item.value}</div>
+                <div>
+                    <span class="stat-label">Realizadas</span>
+                    <strong class="stat-value">{stats.total}</strong>
+                </div>
             </Card>
-        {/each}
-    </div>
+            <Card padding="var(--spacing-6)" style="display: flex; align-items: center; gap: var(--spacing-4);">
+                <div class="stat-icon" style="background-color: var(--primary-50); color: var(--primary-600);">
+                    <CheckCircle size={24} />
+                </div>
+                <div>
+                    <span class="stat-label">Aprobadas</span>
+                    <strong class="stat-value">{stats.approved}</strong>
+                </div>
+            </Card>
+            <Card padding="var(--spacing-6)" style="display: flex; align-items: center; gap: var(--spacing-4);">
+                <div class="stat-icon" style="background-color: var(--primary-50); color: var(--primary-600);">
+                    <Clock size={24} />
+                </div>
+                <div>
+                    <span class="stat-label">Pendientes</span>
+                    <strong class="stat-value">{stats.pending}</strong>
+                </div>
+            </Card>
+            <Card padding="var(--spacing-6)" style="display: flex; align-items: center; gap: var(--spacing-4);">
+                <div class="stat-icon" style="background-color: var(--primary-50); color: var(--primary-600);">
+                    <XCircle size={24} />
+                </div>
+                <div>
+                    <span class="stat-label">Rechazadas</span>
+                    <strong class="stat-value">{stats.rejected}</strong>
+                </div>
+            </Card>
+        </SectionGrid>
+    </Section>
 
-    <!-- Middle Row: Calculator & Rates -->
-    <SectionGrid cols="2">
-        <!-- Premium White Calculator Panel -->
-        <Section class="calculator-panel">
-            <SectionTitle title="Calculadora de Envío">
-                {#snippet action()}
-                    <div class="desktop-only-btn">
-                        <Button variant="primary" onclick={() => goto('/client/new')}>
-                            <Send size={18} /> Nueva Remesa
+    <!-- Main Content Grid -->
+    <div class="main-content">
+        
+        <!-- Left Column: Historial -->
+        <div class="content-left">
+            <Section>
+                <SectionTitle title="Historial Reciente" subtitle="Tus últimas transacciones">
+                    {#snippet action()}
+                        <Button variant="ghost" onclick={() => goto('/client/history')} style="padding: 0; color: var(--primary-600);">
+                            Ver todo <ArrowRight size={16} style="margin-left: 4px;" />
                         </Button>
-                    </div>
-                {/snippet}
-            </SectionTitle>
-            
-            <div class="calc-inner">
-                {#if loadingRates}
-                    <p class="loading-text">Cargando tasas de cambio...</p>
-                {:else if rates.length === 0}
-                    <p class="loading-text">No hay tasas de cambio disponibles por el momento.</p>
-                {:else}
-                    <div class="calc-row">
-                        <div class="input-light">
-                            <Select 
-                                id="rate"
-                                label="Ruta de Envío"
-                                bind:value={selectedRateId}
-                                options={getRateOptions()}
-                            />
-                        </div>
-                        <div class="input-light">
-                            <Input 
-                                id="amount"
-                                label="Monto a Enviar ({selectedRate?._InitialCountry?.currencySymbol || '$'})"
-                                type="number" 
-                                placeholder="0.00" 
-                                bind:value={sendAmount} 
-                            />
-                        </div>
-                    </div>
+                    {/snippet}
+                </SectionTitle>
 
-                    {#if selectedRate && sendAmount && Number(sendAmount) > 0}
-                        <div class="calc-results-light">
-                            <div class="result-box">
-                                <span class="res-label">Tasa de cambio</span>
-                                <span class="res-val">1 {selectedRate._InitialCountry?.currencySymbol} = {selectedRate.rate} {selectedRate._SecondaryCountry?.currencySymbol}</span>
-                            </div>
-                            <div class="result-box">
-                                <span class="res-label">Comisión</span>
-                                <span class="res-val">{selectedRate._InitialCountry?.currencySymbol}{commissionAmount}</span>
-                            </div>
-                            <div class="result-box total-box">
-                                <span class="res-label">Total a Pagar</span>
-                                <span class="res-val-big">{selectedRate._InitialCountry?.currencySymbol}{totalToPay}</span>
-                            </div>
-                            <div class="result-box receive-box">
-                                <span class="res-label">Destinatario Recibe</span>
-                                <span class="res-val-huge">{selectedRate._SecondaryCountry?.currencySymbol}{receivedAmount}</span>
-                            </div>
+                <div class="activity-list">
+                    {#if recentRemittances.length > 0}
+                        {#each recentRemittances as item}
+                            <TransactionCard
+                                id={`#${item.id}`}
+                                date={new Date(item.createdAt).toLocaleDateString()}
+                                amountPaid={`${item.amountSent} ${item._OriginCountry?.currencyCode || ''}`}
+                                amountReceived={`${item.amountReceived || 'N/A'} ${item._DestinationCountry?.currencyCode || ''}`}
+                                status={item.status === 'PENDING' ? 'Pendiente' : item.status === 'APPROVED' ? 'Aprobada' : 'Rechazada'}
+                                destination={item._DestinationCountry?.name || 'Desconocido'}
+                                onClick={() => goto(`/client/history/${item.id}`)}
+                            />
+                        {/each}
+                    {:else}
+                        <div class="empty-state">
+                            <Clock size={48} color="var(--gray-300)" />
+                            <p>No tienes transacciones recientes.</p>
                         </div>
                     {/if}
-                {/if}
-            </div>
-
-            <div class="calc-action mobile-only-btn" style="margin-top: 24px;">
-                <Button variant="primary" onclick={() => goto('/client/new')} class="w-full">
-                    <Send size={18} /> Nueva Remesa
-                </Button>
-            </div>
-        </Section>
-
-        <!-- Rates Panel -->
-        <Section class="rates-panel">
-            <SectionTitle title="Tasas del Sistema" />
-            <div class="rates-list">
-                {#if loadingRates}
-                    <p class="loading-text" style="padding: 12px;">Cargando tasas...</p>
-                {:else if rates.length === 0}
-                    <p class="loading-text" style="padding: 12px;">No hay tasas disponibles por el momento.</p>
-                {:else}
-                    {#each rates as rate}
-                        <div class="rate-item">
-                            <div class="rate-route">
-                                <strong>{rate._InitialCountry?.name || 'Origen'}</strong>
-                                <ArrowRight size={14} color="var(--gray-400)" />
-                                <strong>{rate._SecondaryCountry?.name || 'Destino'}</strong>
-                            </div>
-                            <span class="rate-value">
-                                1 {rate._InitialCountry?.currencySymbol || '$'} = <strong class="text-primary">{rate.rate} {rate._SecondaryCountry?.currencySymbol || 'Bs'}</strong>
-                            </span>
-                        </div>
-                    {/each}
-                {/if}
-            </div>
-        </Section>
-    </SectionGrid>
-
-    <!-- Bottom Row: Transactions -->
-    <Section class="activity-panel full-width">
-        <SectionTitle title="Transacciones Recientes">
-            {#snippet action()}
-                <Button variant="outline" onclick={() => goto('/client/history')}>
-                    Ver historial
-                </Button>
-            {/snippet}
-        </SectionTitle>
-
-        <div class="tx-list">
-            {#each recentActivity as tx}
-                <TransactionCard {...tx} />
-            {/each}
+                </div>
+            </Section>
         </div>
-    </Section>
+
+        <!-- Right Column: Calculadora -->
+        <div class="content-right">
+            <Section>
+                <SectionTitle title="Calculadora Rápida" subtitle="Estima tu próximo envío" />
+                <Card padding="var(--spacing-6)" class="calculator-card">
+                    <form class="calc-form" onsubmit={(e) => { e.preventDefault(); goto('/client/new'); }}>
+                        {#if loadingRates}
+                            <div style="text-align: center; padding: 20px;">Cargando tasas...</div>
+                        {:else}
+                            <Select 
+                                label="Corredor" 
+                                id="rate" 
+                                bind:value={selectedRateId} 
+                                options={getRateOptions()} 
+                            />
+                            
+                            <Input 
+                                label="Monto a Enviar" 
+                                id="sendAmount" 
+                                type="number" 
+                                placeholder="Ej. 100.00" 
+                                bind:value={sendAmount}
+                                min="1"
+                                step="0.01"
+                            >
+                                {#snippet rightIcon()}
+                                    <span class="currency-label">{selectedRate?._InitialCurrency?.code || 'USD'}</span>
+                                {/snippet}
+                            </Input>
+
+                            <div class="calc-result">
+                                <div class="result-row">
+                                    <span>Tasa de cambio:</span>
+                                    <span>{quoteData.exchangeRateValue}</span>
+                                </div>
+                                <div class="result-row highlight">
+                                    <span>Reciben aprox:</span>
+                                    <strong>{quoteData.amountReceived} {selectedRate?._SecondaryCurrency?.code || ''}</strong>
+                                </div>
+                            </div>
+                        {/if}
+
+                        <Button variant="primary" type="submit" style="width: 100%; margin-top: var(--spacing-4);">
+                            <Send size={16} style="margin-right: 8px;" />
+                            Comenzar Envío
+                        </Button>
+                    </form>
+                </Card>
+            </Section>
+        </div>
+
+    </div>
 </div>
 
 <style>
-    .dashboard {
+    .dashboard-page {
         display: flex;
         flex-direction: column;
-        gap: 24px;
-        padding: 0;
+        gap: var(--spacing-8);
+        
         width: 100%;
     }
 
-    .desktop-only-btn {
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-full);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .stat-label {
         display: block;
-    }
-    
-    .mobile-only-btn {
-        display: none;
+        font-size: var(--text-sm);
+        color: var(--gray-500);
+        margin-bottom: 2px;
     }
 
-    /* Top KPI Cards */
-    .summary-grid {
+    .stat-value {
+        display: block;
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--gray-900);
+    }
+
+    .main-content {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 16px;
+        grid-template-columns: 1fr;
+        gap: var(--spacing-8);
+        align-items: start;
     }
 
-    @media (max-width: 1200px) {
-        .summary-grid {
-            grid-template-columns: repeat(2, 1fr);
+    @media (min-width: 1024px) {
+        .main-content {
+            grid-template-columns: 7fr 4fr;
         }
     }
 
-    @media (max-width: 768px) {
-        .summary-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-        .kpi-card {
-            padding: 16px;
-        }
-    }
-
-    @media (max-width: 360px) {
-        .summary-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    .kpi-card {
-        background-color: var(--white);
-        border: 1px solid var(--gray-200);
-        border-radius: 12px;
-        flex: 1;
+    .activity-list {
         display: flex;
         flex-direction: column;
-        justify-content: flex-start;
-        align-items: flex-start;
-        text-align: left;
-        gap: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-        padding: 24px;
-        transition: transform 0.2s, box-shadow 0.2s;
+        gap: var(--spacing-4);
     }
 
-    .kpi-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    :global(.calculator-card) {
+        background: linear-gradient(180deg, var(--white) 0%, var(--gray-50) 100%);
+        border: 1px solid var(--gray-200);
     }
 
-    .kpi-header {
+    .calc-form {
         display: flex;
-        align-items: center;
-        gap: 8px;
+        flex-direction: column;
+        gap: var(--spacing-5);
     }
 
-    .kpi-label {
-        font-size: 14px;
+    .currency-label {
         font-weight: 600;
-        color: var(--gray-600);
+        color: var(--gray-500);
+        padding-right: 8px;
     }
 
-    .kpi-value {
-        font-size: 32px;
-        font-weight: 700;
-        color: var(--gray-900);
-        letter-spacing: -1px;
-    }
-
-    /* Rates Panel */
-    .rates-panel {
+    .calc-result {
         background-color: var(--white);
-        border-radius: 24px;
-        padding: 24px;
-        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-md);
+        padding: var(--spacing-4);
         display: flex;
         flex-direction: column;
+        gap: var(--spacing-2);
+        border: 1px dashed var(--gray-300);
+        margin-top: var(--spacing-2);
     }
 
-    .rates-list {
+    .result-row {
         display: flex;
-        flex-direction: column;
-        gap: 12px;
-        overflow-y: auto;
-        max-height: 200px;
-    }
-
-    .rate-item {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        padding: 12px 16px;
-        background-color: var(--gray-50);
-        border-radius: 12px;
-        border: 1px solid var(--gray-100);
-    }
-
-    .rate-route {
-        display: flex;
+        justify-content: space-between;
         align-items: center;
-        gap: 8px;
-        font-size: 14px;
+        font-size: var(--text-sm);
         color: var(--gray-600);
     }
 
-    .rate-route strong {
+    .result-row.highlight {
+        font-size: var(--text-base);
         color: var(--gray-900);
+        margin-top: 4px;
+        padding-top: 8px;
+        border-top: 1px solid var(--gray-100);
     }
 
-    .rate-value {
-        font-size: 15px;
-        color: var(--gray-700);
-    }
-
-    .text-primary {
-        color: var(--primary-700);
-        font-weight: 700;
-    }
-
-    .calc-inner {
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
-        flex: 1;
-    }
-
-    .calc-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-    }
-    
-    @media (max-width: 640px) {
-        .calc-row {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    .input-light {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .calc-results-light {
-        margin-top: auto;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        background-color: var(--gray-50);
-        border-radius: 16px;
-        padding: 24px;
-    }
-
-    .result-box {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .total-box, .receive-box {
-        grid-column: 1 / -1;
-        padding-top: 16px;
-        border-top: 1px solid var(--gray-200);
-    }
-    
-    .receive-box {
-        background-color: #f3e8ff;
-        border: 1px solid var(--gray-200);
-        border-radius: 12px;
-        padding: 16px;
-        border-top: none;
-    }
-
-    .res-label {
-        font-size: 13px;
-        color: var(--gray-500);
-    }
-
-    .res-val {
-        font-size: 16px;
-        font-weight: 500;
-        color: var(--gray-900);
-    }
-
-    .res-val-big {
-        font-size: 24px;
-        font-weight: 700;
-        color: var(--gray-900);
-    }
-
-    .res-val-huge {
-        font-size: 24px;
-        font-weight: 800;
+    .result-row.highlight strong {
         color: var(--primary-600);
+        font-size: var(--text-lg);
     }
 
-    .loading-text {
-        color: var(--gray-500);
-        text-align: center;
-        padding: 48px;
-    }
-
-    .tx-list {
+    .empty-state {
         display: flex;
         flex-direction: column;
-        gap: 20px;
-    }
-
-    @media (max-width: 768px) {
-        .desktop-only-btn {
-            display: none;
-        }
-
-        .mobile-only-btn {
-            display: block;
-        }
-
-        .tx-list {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(225px, 1fr));
-            gap: 16px;
-        }
+        align-items: center;
+        justify-content: center;
+        padding: 40px;
+        color: var(--gray-500);
+        background: var(--white);
+        border-radius: var(--radius-xl);
+        border: 1px dashed var(--gray-300);
+        gap: 16px;
     }
 </style>

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { page } from '$app/state';
     import { auth } from '$lib/stores/auth.svelte';
     import { USER_TYPES } from '$lib/constants/auth';
@@ -56,7 +56,7 @@
     
     <nav class="sidebar-nav">
         {#each activeMenu as item}
-            <a href={item.path} class="nav-link {currentPath === item.path ? 'active' : ''}">
+            <a href={item.path} class="nav-link {currentPath === item.path || currentPath.startsWith(item.path + '/') ? 'active' : ''}">
                 <svelte:component this={item.icon} size={20} />
                 <span>{item.label}</span>
             </a>
@@ -222,3 +222,4 @@
         color: var(--danger-600);
     }
 </style>
+

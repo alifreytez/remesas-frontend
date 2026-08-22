@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { api } from '$lib/utils/api';
     import Section from '$lib/components/layout/Section.svelte';
     import Grid from '$lib/components/ui/Grid.svelte';
@@ -7,6 +7,7 @@
     import Button from '$lib/components/ui/Button.svelte';
     import Select from '$lib/components/ui/Select.svelte';
     import JsonTableEditor from '$lib/components/ui/JsonTableEditor.svelte';
+    import PermissionGuard from '$lib/components/auth/PermissionGuard.svelte';
     import { confirm, alertMsg } from '$lib/stores/confirm.svelte';
     import { untrack } from 'svelte';
     
@@ -170,9 +171,14 @@
                             {/each}
                         </Grid>
                         <div class="form-actions">
-                            <Button type="submit" variant="primary" disabled={saving}>
-                                {saving ? 'Guardando...' : (currentRecordId ? 'Guardar Cambios' : 'Guardar Registro')}
+                            <Button type="button" variant="secondary" onclick={oncancel} disabled={saving}>
+                                Cancelar
                             </Button>
+                            <PermissionGuard permission={currentRecordId ? 'UI:UPDATE:CONFIGS' : 'UI:CREATE:CONFIGS'}>
+                                <Button type="submit" variant="primary" disabled={saving}>
+                                    {saving ? 'Guardando...' : (currentRecordId ? 'Guardar Cambios' : 'Guardar Registro')}
+                                </Button>
+                            </PermissionGuard>
                         </div>
                     </form>
             </div>
@@ -276,3 +282,4 @@
         grid-column: 1 / -1;
     }
 </style>
+

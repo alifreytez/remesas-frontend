@@ -103,6 +103,8 @@
     .panel-action {
         display: flex;
         align-items: center;
+        gap: 16px;
         min-height: 40px;
     }
 </style>
+

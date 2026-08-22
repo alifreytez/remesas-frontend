@@ -8,14 +8,17 @@
     import Grid from '$lib/components/ui/Grid.svelte';
     import Stack from '$lib/components/ui/Stack.svelte';
     import HintText from '$lib/components/ui/HintText.svelte';
-    import { methodsConfig } from '$lib/data/methodsConfig';
     
     let { 
         contacts,
+        paymentMethods,
+        countries,
         recipientData = $bindable(), 
         nextStep 
     }: {
         contacts: any[];
+        paymentMethods: any[];
+        countries: any[];
         recipientData: any;
         nextStep: () => void;
     } = $props();
@@ -24,28 +27,20 @@
     let selectedContactId = $state<string>('');
     let selectedBankId = $state<string>('');
 
-    let countriesList = [
-        { id: '1', name: 'Venezuela' },
-        { id: '2', name: 'Colombia' },
-        { id: '3', name: 'Perú' },
-        { id: '4', name: 'Chile' }
-    ];
-
-    let availableMethods = Object.keys(methodsConfig);
-
     let currentMethodConfig = $derived(
-        recipientData.method && methodsConfig[recipientData.method]
-            ? methodsConfig[recipientData.method]
+        recipientData.method
+            ? paymentMethods.find(m => m.type_code === recipientData.method) || null
             : null
     );
 
     $effect.pre(() => {
-        if (availableMethods.length > 0 && !availableMethods.includes(recipientData.method)) {
-            recipientData.method = availableMethods[0];
+        const available = paymentMethods.map(m => m.type_code);
+        if (available.length > 0 && !available.includes(recipientData.method)) {
+            recipientData.method = available[0];
         }
         
         if (currentMethodConfig) {
-            currentMethodConfig.fields.forEach(field => {
+            currentMethodConfig.fields_config.forEach((field: any) => {
                 if (recipientData[field.name] === undefined) {
                     recipientData[field.name] = '';
                 }
@@ -66,7 +61,6 @@
             const parts = selectedContact.name.split(' ');
             recipientData.firstName = parts[0] || '';
             recipientData.lastName = parts.slice(1).join(' ') || '';
-            recipientData.document = selectedContact.document;
             recipientData.country = selectedContact.countryId || selectedContact.country || '1'; 
             recipientData.isNew = false;
         } else if (activeTab === 'new') {
@@ -89,9 +83,9 @@
             const bank = selectedContact.bankDetails.find((b: any) => b.id === selectedBankId);
             if (bank) {
                 recipientData.method = bank.method;
-                if (methodsConfig[bank.method]) {
-                    const config = methodsConfig[bank.method];
-                    for (const field of config.fields) {
+                const config = paymentMethods.find(m => m.type_code === bank.method);
+                if (config) {
+                    for (const field of config.fields_config) {
                         recipientData[field.name] = bank[field.name] || '';
                     }
                 }
@@ -103,10 +97,10 @@
         if (activeTab === 'directory') {
             return !!selectedContactId && !!selectedBankId;
         } else {
-            if (!recipientData.firstName || !recipientData.document || !recipientData.country || !recipientData.method) return false;
+            if (!recipientData.firstName || !recipientData.country || !recipientData.method) return false;
             if (!currentMethodConfig) return false;
             
-            for (const field of currentMethodConfig.fields) {
+            for (const field of currentMethodConfig.fields_config) {
                 if (field.required && !recipientData[field.name]) {
                     return false;
                 }
@@ -116,7 +110,8 @@
     });
     function formatBankDetails(b: any) {
         const parts = [];
-        if (methodsConfig[b.method]?.name) parts.push(methodsConfig[b.method].name);
+        const config = paymentMethods.find(m => m.type_code === b.method);
+        if (config?.name) parts.push(config.name);
         if (b.bank) parts.push(b.bank);
         if (b.phone) parts.push(b.phone);
         if (b.accountNumber) parts.push(`Cta: ${b.accountNumber}`);
@@ -169,44 +164,47 @@
                 <HintText text="Este contacto no tiene cuentas bancarias guardadas." />
             {/if}
 
-            <Input label="Concepto (Opcional)" bind:value={recipientData.concept} />
+            <Input label="Concepto (Opcional)" placeholder="Ej. Remesa mensual" bind:value={recipientData.concept} />
         </Grid>
     {:else}
         <Stack gap="var(--spacing-8)">
             <SectionAccordion title="Datos Personales">
-                <Grid cols={2}>
-                    <Input label="Nombre(s)" format="name" bind:value={recipientData.firstName} required />
-                    <Input label="Apellido(s)" format="name" bind:value={recipientData.lastName} required />
+                <Grid cols={2} colsSm={1}>
+                    <Input label="Nombre(s)" type="text" format="name" placeholder="Ej. Juan Carlos" bind:value={recipientData.firstName} required />
+                    <Input label="Apellido(s)" type="text" format="name" placeholder="Ej. Pérez Gómez" bind:value={recipientData.lastName} required />
                 </Grid>
                 
-                <Grid cols={2}>
-                    <Input label="Documento de Identidad" format="document" bind:value={recipientData.document} required />
+                <Grid cols={2} colsSm={1}>
                     <Select 
                         label="País de Residencia" 
-                        options={countriesList.map(c => ({ value: c.id, label: c.name }))}
+                        placeholder="Selecciona una opción"
+                        options={countries.map(c => ({ value: c.id, label: c.name }))}
                         bind:value={recipientData.country} 
                         required 
                     />
+                    <Input label="Correo Electrónico (Opcional)" type="email" format="email" placeholder="Ej. juan.perez@email.com" bind:value={recipientData.email} />
                 </Grid>
             </SectionAccordion>
 
             <SectionAccordion title="Datos Bancarios">
-                {#if availableMethods.length > 0}
+                {#if paymentMethods.length > 0}
                     <Grid cols={1}>
                         <Select 
-                            label="Método de Recepción" 
-                            options={availableMethods.map(m => ({ value: m, label: methodsConfig[m].name }))}
+                            label="Método de Pago" 
+                            placeholder="Selecciona un método"
+                            options={paymentMethods.map(m => ({ value: m.type_code, label: m.name }))}
                             bind:value={recipientData.method}
                         />
                     </Grid>
 
                     {#if currentMethodConfig}
                         <Grid cols={2}>
-                            {#each currentMethodConfig.fields as field}
+                            {#each currentMethodConfig.fields_config as field}
                                 <div class="form-field-wrapper">
                                     <Input 
                                         label={field.label} 
                                         type={field.type}
+                                        placeholder={field.placeholder || ''}
                                         bind:value={recipientData[field.name]} 
                                         required={field.required} 
                                     />
@@ -245,26 +243,26 @@
         width: 100%;
         background-color: var(--white);
         border: 1px solid var(--gray-200);
-        border-radius: 8px;
+        border-radius: var(--radius-lg);
         overflow: hidden;
         margin-bottom: var(--spacing-8);
     }
 
     .tab-btn {
         flex: 1;
-        padding: 12px 16px;
+        padding: var(--spacing-3) var(--spacing-4);
         background: transparent;
         border: none;
         color: var(--gray-500);
         font-weight: 600;
-        font-size: 14px;
+        font-size: var(--text-sm);
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all var(--transition-fast);
     }
 
     .tab-btn.active {
         background-color: var(--gray-900);
-        color: white;
+        color: var(--white);
     }
 
     /* Removed local layout CSS classes (.form-container, .form-row, .dynamic-fields, .single-col, .empty-state-note, .no-methods-alert) */
@@ -280,3 +278,4 @@
         padding-top: var(--spacing-6);
     }
 </style>
+

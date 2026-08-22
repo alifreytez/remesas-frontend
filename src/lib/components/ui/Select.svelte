@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { ChevronDown, Search, Check } from 'lucide-svelte';
     import { onMount, onDestroy, tick } from 'svelte';
 
@@ -416,3 +416,4 @@
         border-radius: 10px;
     }
 </style>
+

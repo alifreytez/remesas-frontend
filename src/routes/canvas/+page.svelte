@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import Header from '$lib/components/layout/Header.svelte';
     import Sidebar from '$lib/components/layout/Sidebar.svelte';
     import Button from '$lib/components/ui/Button.svelte';
@@ -84,7 +84,7 @@
                 <Card padding="20px">
                     <div class="flex-col">
                         <Button variant="primary">Botón Primario</Button>
-                        <Button variant="outline">Botón Secundario (Outline)</Button>
+                        <Button variant="secondary">Botón Secundario (Outline)</Button>
                         <div style="display: flex; gap: 16px; margin-top: 8px; align-items: center;">
                             <Button variant="icon">
                                 <Plus size={24} />
@@ -233,3 +233,4 @@
         color: var(--text-muted);
     }
 </style>
+

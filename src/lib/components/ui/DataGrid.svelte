@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import type { Snippet } from 'svelte';
     import Switch from './Switch.svelte';
 
@@ -120,3 +120,4 @@
         font-style: italic;
     }
 </style>
+

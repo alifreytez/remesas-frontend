@@ -58,7 +58,7 @@
     }
 
     .title {
-        font-size: 16px;
+        font-size: var(--text-base);
         font-weight: 600;
         color: var(--gray-900);
         margin: 0;
@@ -93,3 +93,4 @@
         min-width: 0;
     }
 </style>
+

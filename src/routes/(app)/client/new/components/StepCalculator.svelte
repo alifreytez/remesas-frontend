@@ -7,26 +7,34 @@
     import Stack from '$lib/components/ui/Stack.svelte';
     
     let { 
-        rates, 
-        selectedRateId = $bindable(), 
+        platformAccounts,
+        paymentMethods,
+        selectedPlatformAccountId = $bindable(), 
         sendAmount = $bindable(),
         commissionAmount,
         receivedAmount,
         totalToPay,
         selectedRate,
+        isLoading = false,
         prevStep,
         nextStep 
     }: {
-        rates: any[];
-        selectedRateId: string;
+        platformAccounts: any[];
+        paymentMethods: any[];
+        selectedPlatformAccountId: string;
         sendAmount: string;
         commissionAmount: string;
         receivedAmount: string;
         totalToPay: string;
         selectedRate: any;
+        isLoading?: boolean;
         prevStep: () => void;
         nextStep: () => void;
     } = $props();
+
+    function getMethodName(typeCode: string) {
+        return paymentMethods.find(m => m.type_code === typeCode)?.name || typeCode;
+    }
 </script>
 
 <div class="step-content">
@@ -34,9 +42,9 @@
         <!-- Columna Izquierda: Controles -->
         <Stack gap="var(--spacing-6)">
             <Select 
-                label="Ruta y Tasa de Cambio" 
-                options={rates.map(r => ({ value: r.id, label: r.label }))}
-                bind:value={selectedRateId}
+                label="¿Cómo deseas pagar?" 
+                options={platformAccounts.map(acc => ({ value: acc.id, label: `${getMethodName(acc.paymentMethod)} (${acc.currency.code})` }))}
+                bind:value={selectedPlatformAccountId}
             />
 
             <Input 
@@ -51,8 +59,8 @@
         <div class="calc-results">
             <h4 class="results-title">Resumen de Conversión</h4>
             <div class="result-row">
-                <span>Tasa de cambio:</span>
-                <span>1 {selectedRate.originCurrency.code} = {selectedRate.rate} {selectedRate.destinationCurrency.symbol}</span>
+                <span>Ruta y Tasa:</span>
+                <span>{selectedRate.originCurrency.code} a {selectedRate.destinationCurrency.code} (1 = {selectedRate.rate})</span>
             </div>
             <div class="result-row">
                 <span>Comisión (5%):</span>
@@ -71,10 +79,10 @@
     </Grid>
 
     <div class="actions">
-        <Button variant="outline" type="button" onclick={prevStep}>
+        <Button variant="secondary" type="button" onclick={prevStep}>
             Atrás
         </Button>
-        <Button variant="primary" disabled={!sendAmount || Number(sendAmount) <= 0} onclick={nextStep}>
+        <Button variant="primary" disabled={!sendAmount || Number(sendAmount) <= 0 || isLoading} onclick={nextStep}>
             Continuar <ArrowRight size={16} />
         </Button>
     </div>
@@ -144,3 +152,4 @@
         padding-top: var(--spacing-6);
     }
 </style>
+

@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { goto } from '$app/navigation';
     import { api } from '$lib/utils/api';
     import { REGEX } from '$lib/constants/regex';
@@ -134,3 +134,4 @@
         height: var(--spacing-4);
     }
 </style>
+

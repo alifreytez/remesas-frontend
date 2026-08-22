@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     let {
         text = '',
         children,
@@ -24,3 +24,4 @@
         line-height: 1.5;
     }
 </style>
+

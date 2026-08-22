@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     let {
         text = '',
         variant = 'info' // 'info', 'success', 'warning', 'danger'
@@ -44,3 +44,4 @@
         color: #b91c1c;
     }
 </style>
+

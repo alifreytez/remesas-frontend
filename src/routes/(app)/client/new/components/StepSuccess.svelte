@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { CheckCircle, Upload } from 'lucide-svelte';
     import Button from '$lib/components/ui/Button.svelte';
     
@@ -29,7 +29,7 @@
     <div class="upload-box mt-6">
         <Upload size={24} color="var(--gray-400)" />
         <p>Sube tu comprobante de pago aquí (opcional por ahora)</p>
-        <Button variant="outline" size="sm" class="mt-2">Seleccionar Archivo</Button>
+        <Button variant="secondary" size="sm" class="mt-2">Seleccionar Archivo</Button>
     </div>
 
     <div class="actions center mt-6">
@@ -112,3 +112,4 @@
         justify-content: center;
     }
 </style>
+

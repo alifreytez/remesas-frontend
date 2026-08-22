@@ -7,6 +7,8 @@
     import Card from '$lib/components/ui/Card.svelte';
     import Table from '$lib/components/ui/Table.svelte';
     import PermissionGuard from '$lib/components/auth/PermissionGuard.svelte';
+    import { onMount } from 'svelte';
+    import { api } from '$lib/utils/api';
     
     $effect(() => {
         setHeader('Dashboard Operativo', false, '', null);
@@ -15,11 +17,8 @@
         };
     });
 
-    // Mock data for the table
-    const pendingRemittances = [
-        { id: '#106', cliente: 'Ali Freytez', corredor: 'CHL -> COL', monto: '$100', estado: 'PENDING' },
-        { id: '#107', cliente: 'Maria Paz', corredor: 'PER -> CHL', monto: '50 PEN', estado: 'PENDING' },
-    ];
+    let pendingRemittances = $state<any[]>([]);
+    let loading = $state(true);
 
     const tableColumns = [
         { key: 'id', label: 'ID' },
@@ -28,6 +27,28 @@
         { key: 'monto', label: 'Monto' },
         { key: 'estado', label: 'Estado', format: 'badge' as const, width: '1%' }
     ];
+
+    onMount(async () => {
+        try {
+            loading = true;
+            // Fetch real pending remittances
+            const response = await api.get<{data: {rows: any[]}}>('/remittances?filters[status]=PENDING');
+            const rawData = response.data?.rows || (Array.isArray(response.data) ? response.data : []);
+            
+            pendingRemittances = rawData.map((r: any) => ({
+                id: `#${r.id}`,
+                cliente: r._Client?._Person ? `${r._Client._Person.firstName} ${r._Client._Person.lastName}` : 'Desconocido',
+                corredor: `${r._OriginCountry?.isoAlpha3 || '???'} -> ${r._DestinationCountry?.isoAlpha3 || '???'}`,
+                monto: `${r.amountSent} ${r._OriginCountry?.currencyCode || ''}`,
+                estado: r.status
+            }));
+        } catch (error) {
+            console.error('Error fetching pending remittances:', error);
+            pendingRemittances = [];
+        } finally {
+            loading = false;
+        }
+    });
 </script>
 
 <div class="admin-dashboard">
@@ -35,21 +56,21 @@
         
         <PermissionGuard permission="UI:VIEW:DASHBOARD_STATS">
             <Section>
-                <SectionTitle title="Ingresos del Día por País de Origen" />
+                <SectionTitle title="Ingresos del Día por País de Origen (Proximamente)" />
                 <Grid cols="1fr 1fr" gap="var(--spacing-6)">
                     <div class="stat-item border-left border-green">
                         <span class="stat-label">CHILE</span>
-                        <span class="stat-value">$1,240.50</span>
+                        <span class="stat-value">$0.00</span>
                     </div>
                     <div class="stat-item border-left border-blue">
                         <span class="stat-label">PERÚ</span>
-                        <span class="stat-value">$850.00</span>
+                        <span class="stat-value">$0.00</span>
                     </div>
                 </Grid>
             </Section>
 
             <Section>
-                <SectionTitle title="Tasas Vigentes" />
+                <SectionTitle title="Tasas Vigentes (Sincronizadas con BD)" />
                 <div class="inline-stats">
                     <div class="stat-group">
                         <span class="stat-label">VEN &lt;-&gt; CHI:</span>
@@ -61,89 +82,87 @@
                     </div>
                 </div>
             </Section>
+        </PermissionGuard>
 
-            <Section>
-                <SectionTitle title="Comisiones (Por Corredor)" />
-                <div class="stat-group">
-                    <span class="stat-label">Chile -&gt; Perú:</span>
-                    <span class="stat-value-sm">2.5% + $1</span>
+        <Section>
+            <SectionTitle title="Solicitudes Pendientes" subtitle="Remesas esperando validación operativa" />
+            {#if loading}
+                <div style="padding: 40px; text-align: center; color: var(--gray-500);">
+                    Cargando solicitudes...
                 </div>
-            </Section>
-        </PermissionGuard>
-
-        <PermissionGuard permission="UI:VIEW:REMITTANCES">
-            <Section>
-                <SectionTitle title="Últimas Remesas en Cola" />
-                <Table 
-                    data={pendingRemittances} 
-                    columns={tableColumns} 
-                    variant="v2" 
-                    paginated={false} 
-                />
-            </Section>
-        </PermissionGuard>
-
+            {:else}
+                <Table columns={tableColumns} data={pendingRemittances} variant="v2" />
+            {/if}
+        </Section>
+        
     </Stack>
 </div>
 
 <style>
     .admin-dashboard {
-        max-width: 1200px;
+        
+        width: 100%;
     }
 
     .stat-item {
+        background: var(--color-white);
+        padding: var(--spacing-6);
+        border: 1px solid var(--neutral-200);
+        border-radius: var(--radius-xl);
         display: flex;
         flex-direction: column;
         gap: var(--spacing-2);
-        padding-left: var(--spacing-4);
-    }
-    
-    .border-left {
-        border-left: 4px solid var(--gray-300);
-    }
-    
-    .border-green {
-        border-color: var(--success-500);
-    }
-    
-    .border-teal {
-        border-color: var(--primary-500);
+        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
     }
 
+    .border-left {
+        border-left-width: 4px;
+    }
+
+    .border-green { border-left-color: var(--success-500, #10b981); }
+    .border-blue { border-left-color: var(--primary-500, #3b82f6); }
+
     .stat-label {
-        font-size: 14px;
+        font-size: var(--text-sm);
         font-weight: 600;
-        color: var(--gray-600);
+        color: var(--neutral-500);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.05em;
     }
 
     .stat-value {
         font-size: 28px;
         font-weight: 700;
-        color: var(--gray-900);
+        color: var(--neutral-900);
     }
 
     .inline-stats {
         display: flex;
-        align-items: center;
-        gap: var(--spacing-4);
+        gap: var(--spacing-8);
+        background: var(--color-white);
+        padding: var(--spacing-4) var(--spacing-6);
+        border: 1px solid var(--neutral-200);
+        border-radius: var(--radius-xl);
+        flex-wrap: wrap;
     }
 
     .stat-group {
         display: flex;
         align-items: center;
-        gap: var(--spacing-2);
+        gap: var(--spacing-3);
+    }
+
+    .stat-group .stat-label {
+        color: var(--neutral-500);
+        font-size: var(--text-sm);
     }
 
     .stat-value-sm {
-        font-size: 16px;
-        font-weight: 600;
-        color: var(--gray-900);
-    }
-
-    .stat-divider {
-        color: var(--gray-400);
-        font-size: 18px;
+        font-weight: 700;
+        font-size: var(--text-base);
+        color: var(--neutral-900);
+        background: var(--neutral-100);
+        padding: 4px 12px;
+        border-radius: var(--radius-full);
     }
 </style>

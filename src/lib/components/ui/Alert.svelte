@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import type { Snippet } from 'svelte';
     import { Info, AlertTriangle, CheckCircle, XCircle } from 'lucide-svelte';
 
@@ -91,3 +91,4 @@
         color: #b91c1c;
     }
 </style>
+

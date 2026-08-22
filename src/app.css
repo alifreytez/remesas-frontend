@@ -7,6 +7,7 @@
     --text-muted: #4B5563;
     --accent-green: #047857;
     --accent-purple: #6200EA;
+    --accent-blue: #2563eb;
     --border-color: #E5E7EB;
 
     /* Extended Semantic Colors */
@@ -51,6 +52,14 @@
 
     /* Transitions */
     --transition-fast: 0.15s ease-in-out;
+
+    /* Typography Tokens */
+    --text-xs: 12px;
+    --text-sm: 14px;
+    --text-base: 16px;
+    --text-lg: 18px;
+    --text-xl: 20px;
+    --text-2xl: 24px;
 }
 
 *, *::before, *::after {

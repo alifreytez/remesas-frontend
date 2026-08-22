@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     let {
         gap = 'var(--spacing-4)',
         children,
@@ -20,3 +20,4 @@
         max-width: 100%;
     }
 </style>
+

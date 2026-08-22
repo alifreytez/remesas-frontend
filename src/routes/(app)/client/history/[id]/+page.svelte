@@ -1,399 +1,613 @@
 <script lang="ts">
     import { page } from '$app/state';
     import { goto } from '$app/navigation';
+    import { setHeader } from '$lib/stores/header.svelte';
     import Card from '$lib/components/ui/Card.svelte';
+    import Section from '$lib/components/layout/Section.svelte';
+    import SectionTitle from '$lib/components/layout/SectionTitle.svelte';
     import Button from '$lib/components/ui/Button.svelte';
-    import { ArrowLeft, CheckCircle, Clock, MapPin, Landmark, FileText, Download } from 'lucide-svelte';
+    import { CheckCircle, Clock, MapPin, Landmark, FileText, Download } from 'lucide-svelte';
+    import { api } from '$lib/utils/api';
+    import { onMount } from 'svelte';
 
     let remittanceId = $derived(page.params.id);
 
-    // Mock Data
-    let remittance = {
-        id: 'RM-1030',
-        date: '11 Ago 2026, 14:30',
-        status: 'Pendiente Pago',
-        beneficiary: {
-            name: 'Juan Pérez',
-            document: 'V-12345678',
-            phone: '+58 412 1234567',
-            country: 'Venezuela'
-        },
-        method: 'Pago Móvil',
-        financial: {
-            sendAmount: '100.00',
-            currencySend: 'USD',
-            exchangeRate: '42.50',
-            commission: '5.00',
-            totalPaid: '105.00',
-            receiveAmount: '4250.00',
-            currencyReceive: 'Bs'
+    let paymentMethods = $state<any[]>([]);
+    let remittance = $state<any>(null);
+    let loading = $state(true);
+
+    let currentMethodConfig = $derived(
+        remittance && paymentMethods.length > 0
+            ? paymentMethods.find(m => m.id === remittance.paymentMethod || m.type_code === remittance._RecipientDetails?.method) || null
+            : null
+    );
+
+    let bankFieldsCount = $derived(
+        1 + (currentMethodConfig && currentMethodConfig.fields_config ? currentMethodConfig.fields_config.length : 0)
+    );
+    let bankGridClass = $derived(bankFieldsCount >= 3 ? 'grid-cols-3' : 'grid-cols-2');
+
+    $effect(() => {
+        if (remittance) {
+            setHeader(
+                `Detalle de Remesa #${remittance.id}`, 
+                true, 
+                '/client/history', 
+                null, 
+                { text: remittance.status }
+            );
+        } else {
+            setHeader('Cargando Detalle...', true, '/client/history', null);
         }
-    };
+
+        return () => {
+            setHeader('', false, '', null);
+        };
+    });
+
+    onMount(async () => {
+        try {
+            loading = true;
+            
+            const [remRes, pmRes] = await Promise.all([
+                api.get<{data: any}>(`/remittances/${remittanceId}`),
+                api.get<{data: any}>('/remittances/options')
+            ]);
+            
+            remittance = remRes.data;
+            paymentMethods = pmRes.data.paymentMethods || [];
+        } catch (error) {
+            console.error('Error fetching remittance:', error);
+            goto('/client/history');
+        } finally {
+            loading = false;
+        }
+    });
+
+    function getMethodName(methodCode: string | undefined) {
+        if (!methodCode) return 'Desconocido';
+        const m = paymentMethods.find(x => x.type_code === methodCode);
+        return m ? m.name : methodCode;
+    }
+
+    function formatDate(dateStr: string | null | undefined) {
+        if (!dateStr) return 'Pendiente';
+        return new Date(dateStr).toLocaleString();
+    }
 </script>
 
-<div class="remittance-details">
-    <div class="header-section">
-        <button class="back-button" onclick={() => goto('/client/history')}>
-            <ArrowLeft size={20} /> Volver al Historial
-        </button>
-        <div class="title-row">
-            <h1 class="page-title">Detalle de Remesa {remittance.id}</h1>
-            <span class="status-badge status-info">{remittance.status}</span>
+<div class="remittance-detail-page">
+    {#if loading}
+        <div class="loading-state">
+            <p>Cargando detalles de la remesa...</p>
         </div>
-    </div>
-
-    <div class="details-grid">
-        <div class="main-details">
-            <Card padding="24px">
-                <h3 class="section-title"><Clock size={18} /> Estado Actual</h3>
-                <div class="timeline">
-                    <div class="timeline-item active">
-                        <div class="timeline-dot"></div>
-                        <div class="timeline-content">
-                            <strong>Registrada</strong>
-                            <span>11 Ago 2026, 14:30</span>
-                        </div>
-                    </div>
-                    <div class="timeline-item active">
-                        <div class="timeline-dot"></div>
-                        <div class="timeline-content">
-                            <strong>Esperando Pago</strong>
-                            <span>Sube tu comprobante para continuar</span>
-                        </div>
-                    </div>
-                    <div class="timeline-item">
-                        <div class="timeline-dot"></div>
-                        <div class="timeline-content">
-                            <strong>En Proceso</strong>
-                            <span>Validación administrativa</span>
-                        </div>
-                    </div>
-                    <div class="timeline-item">
-                        <div class="timeline-dot"></div>
-                        <div class="timeline-content">
-                            <strong>Completada</strong>
-                            <span>Dinero entregado al beneficiario</span>
-                        </div>
-                    </div>
+    {:else if remittance}
+        {#if remittance.status === 'REJECTED' || remittance.status === 'RECHAZADA'}
+            <div class="status-alert rejected">
+                <div class="alert-icon"><FileText size={20} /></div>
+                <div class="alert-content">
+                    <h4>Remesa Cancelada o Rechazada</h4>
+                    <p>{remittance.rejectionReason || 'No se especificó motivo de rechazo.'}</p>
                 </div>
-            </Card>
+            </div>
+        {/if}
 
-            <Card padding="24px">
-                <h3 class="section-title"><Landmark size={18} /> Beneficiario y Método</h3>
-                <div class="info-grid">
-                    <div class="info-group">
-                        <span class="label">Beneficiario</span>
-                        <span class="value">{remittance.beneficiary.name}</span>
-                    </div>
-                    <div class="info-group">
-                        <span class="label">Documento</span>
-                        <span class="value">{remittance.beneficiary.document}</span>
-                    </div>
-                    <div class="info-group">
-                        <span class="label">Teléfono</span>
-                        <span class="value">{remittance.beneficiary.phone}</span>
-                    </div>
-                    <div class="info-group">
-                        <span class="label">Destino</span>
-                        <span class="value">{remittance.beneficiary.country}</span>
-                    </div>
-                    <div class="info-group full-width mt-2">
-                        <span class="label">Método de Recepción</span>
-                        <span class="value highlight">{remittance.method}</span>
-                    </div>
-                </div>
-            </Card>
+        <div class="detail-grid">
+            <div class="main-column">
+                <!-- Timeline de Estados -->
+                <Section class="detail-section">
+                    <SectionTitle title="Estado del Envío" />
+                    <Card padding="var(--spacing-6)">
+                        <div class="status-timeline">
+                            <div class="timeline-step completed">
+                                <div class="step-icon"><CheckCircle size={20} /></div>
+                                <div class="step-info">
+                                    <strong>Registrada</strong>
+                                    <span>{formatDate(remittance.createdAt)}</span>
+                                </div>
+                            </div>
+                            
+                            <div class={`timeline-line ${remittance.status !== 'PENDING' && remittance.status !== 'PENDIENTE DE REVISION' ? 'completed' : ''}`}></div>
+                            
+                            <div class={`timeline-step ${remittance.status !== 'PENDING' && remittance.status !== 'PENDIENTE DE REVISION' ? 'completed' : remittance.status === 'REJECTED' ? 'rejected' : 'active'}`}>
+                                <div class="step-icon"><Clock size={20} /></div>
+                                <div class="step-info">
+                                    <strong>Validación</strong>
+                                    <span>
+                                        {#if remittance.status === 'REJECTED'}
+                                            Rechazada
+                                        {:else if remittance.status === 'APPROVED'}
+                                            Completada
+                                        {:else}
+                                            En proceso
+                                        {/if}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class={`timeline-line ${remittance.status === 'APPROVED' ? 'completed' : ''}`}></div>
+
+                            <div class={`timeline-step ${remittance.status === 'APPROVED' ? 'completed' : 'pending'}`}>
+                                <div class="step-icon"><Landmark size={20} /></div>
+                                <div class="step-info">
+                                    <strong>Completada</strong>
+                                    <span>{formatDate(remittance.updatedAt)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </Section>
+
+                <!-- Detalles Financieros -->
+                <Section class="detail-section">
+                    <SectionTitle title="Detalle Financiero" />
+                    <Card padding="0">
+                        <div class="financial-summary">
+                            <div class="fin-row">
+                                <span class="fin-label">Monto Enviado</span>
+                                <span class="fin-value">{remittance.amountSent} {remittance._OriginCountry?.currencyCode || ''}</span>
+                            </div>
+                            <div class="fin-row">
+                                <span class="fin-label">Comisión e Impuestos</span>
+                                <span class="fin-value text-danger">+ {remittance.totalFees || '0.00'} {remittance._OriginCountry?.currencyCode || ''}</span>
+                            </div>
+                            <div class="fin-row highlight-row">
+                                <span class="fin-label">Total Pagado</span>
+                                <strong class="fin-value">{remittance.amountToPay || remittance.amountSent} {remittance._OriginCountry?.currencyCode || ''}</strong>
+                            </div>
+                            
+                            <div class="fin-divider"></div>
+                            
+                            <div class="fin-row">
+                                <span class="fin-label">Tasa de Cambio</span>
+                                <span class="fin-value">{remittance.exchangeRateValue || 'N/A'}</span>
+                            </div>
+                            <div class="fin-row receive-row">
+                                <span class="fin-label">Monto a Recibir</span>
+                                <strong class="fin-value receive-value">{remittance.amountReceived || 'N/A'} {remittance._DestinationCountry?.currencyCode || ''}</strong>
+                            </div>
+                        </div>
+                    </Card>
+                </Section>
+
+                <!-- Informacion del Beneficiario y Banco -->
+                <Section class="detail-section">
+                    <SectionTitle title="Datos del Destinatario" />
+                    <Card padding="var(--spacing-6)">
+                        <div class="info-group-container">
+                            <div class="info-group">
+                                <div class="info-icon"><MapPin size={20} /></div>
+                                <div class="info-content">
+                                    <h5>Beneficiario</h5>
+                                    <p>{remittance._RecipientDetails?.contactName || 'Desconocido'}</p>
+                                    <span class="sub-text">{remittance._DestinationCountry?.name || ''}</span>
+                                </div>
+                            </div>
+
+                            <hr class="section-divider" />
+                            
+                            <div class="info-group">
+                                <div class="info-icon"><Landmark size={20} /></div>
+                                <div class="info-content w-full">
+                                    <h5>Detalles Bancarios</h5>
+                                    <div class={`bank-grid ${bankGridClass}`}>
+                                        <div class="bank-field">
+                                            <span class="field-label">Método</span>
+                                            <span class="field-value">{getMethodName(remittance._RecipientDetails?.method)}</span>
+                                        </div>
+                                        
+                                        {#if currentMethodConfig && currentMethodConfig.fields_config}
+                                            {#each currentMethodConfig.fields_config as field}
+                                                <div class="bank-field">
+                                                    <span class="field-label">{field.label}</span>
+                                                    <span class="field-value">{remittance._RecipientDetails?.[field.name] || 'N/A'}</span>
+                                                </div>
+                                            {/each}
+                                        {:else}
+                                            <!-- Fallback if method config not found -->
+                                            {#each Object.entries(remittance._RecipientDetails || {}).filter(([k]) => k !== 'method' && k !== 'contactName' && k !== 'saveContact') as [k, v]}
+                                                <div class="bank-field">
+                                                    <span class="field-label">{k}</span>
+                                                    <span class="field-value">{v as any}</span>
+                                                </div>
+                                            {/each}
+                                        {/if}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </Section>
+            </div>
+
+            <!-- Columna lateral para Recibos y Soporte -->
+            <div class="side-column">
+                <Section class="detail-section">
+                    <SectionTitle title="Documentos" />
+                    <Card padding="var(--spacing-4)">
+                        <div class="docs-list">
+                            <button class="doc-btn">
+                                <div class="doc-icon"><FileText size={18} /></div>
+                                <div class="doc-text">
+                                    <span>Comprobante de Envío</span>
+                                    <small>PDF (Automático)</small>
+                                </div>
+                                <Download size={16} class="doc-download" />
+                            </button>
+                            
+                            <!-- Comprobante del usuario -->
+                            {#if remittance._Receipts && remittance._Receipts.length > 0}
+                                {#each remittance._Receipts as receipt}
+                                    <button class="doc-btn">
+                                        <div class="doc-icon"><FileText size={18} /></div>
+                                        <div class="doc-text">
+                                            <span>Baucher de Pago</span>
+                                            <small>{new Date(receipt.createdAt).toLocaleDateString()}</small>
+                                        </div>
+                                        <Download size={16} class="doc-download" />
+                                    </button>
+                                {/each}
+                            {/if}
+                        </div>
+                    </Card>
+                </Section>
+            </div>
         </div>
-
-        <div class="financial-details">
-            <Card padding="24px" class="receipt-card">
-                <h3 class="section-title"><FileText size={18} /> Desglose Financiero</h3>
-                
-                <div class="receipt-body">
-                    <div class="receipt-row">
-                        <span>Monto Enviado</span>
-                        <strong>{remittance.financial.currencySend} {remittance.financial.sendAmount}</strong>
-                    </div>
-                    <div class="receipt-row">
-                        <span>Tasa de Cambio</span>
-                        <span>1 USD = {remittance.financial.exchangeRate} Bs</span>
-                    </div>
-                    <div class="receipt-row">
-                        <span>Comisión por Envío</span>
-                        <span>{remittance.financial.currencySend} {remittance.financial.commission}</span>
-                    </div>
-                    
-                    <div class="divider"></div>
-                    
-                    <div class="receipt-row total">
-                        <span>Total Pagado</span>
-                        <strong>{remittance.financial.currencySend} {remittance.financial.totalPaid}</strong>
-                    </div>
-
-                    <div class="receipt-row receive">
-                        <span>Destinatario Recibe</span>
-                        <strong>{remittance.financial.currencyReceive} {remittance.financial.receiveAmount}</strong>
-                    </div>
-                </div>
-
-                <div class="actions">
-                    <Button variant="outline" style="width: 100%;">
-                        <span class="flex justify-center items-center gap-2">
-                            <Download size={16} /> Descargar Recibo
-                        </span>
-                    </Button>
-                </div>
-            </Card>
-        </div>
-    </div>
+    {/if}
 </div>
 
 <style>
-    .remittance-details {
-        display: flex;
-        flex-direction: column;
-        gap: 24px;
-        padding-top: 16px;
-        max-width: 1000px;
-        margin: 0 auto;
+    .remittance-detail-page {
+        
         width: 100%;
-    }
-
-    .header-section {
         display: flex;
         flex-direction: column;
-        gap: 12px;
-        align-items: flex-start;
+        gap: var(--spacing-6);
     }
 
-    .back-button {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: transparent;
-        border: none;
-        color: var(--gray-500);
-        font-weight: 500;
-        cursor: pointer;
-        padding: 0;
-        font-size: 14px;
-        transition: color 0.2s;
-    }
-
-    .back-button:hover {
-        color: var(--gray-900);
-    }
-
-    .title-row {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        flex-wrap: wrap;
-    }
-
-    .page-title {
-        font-size: 24px;
-        font-weight: 700;
-        color: var(--gray-900);
-        margin: 0;
-    }
-
-    .status-badge {
-        font-size: 12px;
-        font-weight: 600;
-        padding: 4px 12px;
-        border-radius: 9999px;
-    }
-
-    .status-info {
-        background-color: #e0f2fe;
-        color: #0369a1;
-    }
-
-    .details-grid {
+    .detail-grid {
         display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: 24px;
+        grid-template-columns: 1fr;
+        gap: var(--spacing-6);
+        align-items: start;
     }
 
-    @media (max-width: 860px) {
-        .details-grid {
-            grid-template-columns: 1fr;
+    @media (min-width: 1024px) {
+        .detail-grid {
+            grid-template-columns: 2fr 1fr;
         }
     }
 
-    .main-details {
+    .main-column, .side-column {
         display: flex;
         flex-direction: column;
-        gap: 24px;
+        gap: var(--spacing-6);
     }
 
-    .section-title {
+    :global(.detail-section) {
+        width: 100%;
         display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 16px;
-        font-weight: 700;
-        color: var(--gray-900);
-        margin: 0 0 20px 0;
-        border-bottom: 1px solid var(--gray-200);
-        padding-bottom: 12px;
+        flex-direction: column;
+    }
+
+    /* Status Alert */
+    .status-alert {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--spacing-4);
+        padding: var(--spacing-4);
+        border-radius: var(--radius-lg);
+        background-color: var(--color-white);
+        border: 1px solid var(--neutral-200);
+    }
+
+    .status-alert.rejected {
+        background-color: #fef2f2;
+        border-color: #fecaca;
+    }
+    .status-alert.rejected .alert-icon {
+        color: #ef4444;
+    }
+    .status-alert.rejected h4 {
+        color: #991b1b;
+    }
+
+    .alert-content h4 {
+        margin: 0 0 4px 0;
+        font-size: var(--text-base);
+        font-weight: 600;
+    }
+    
+    .alert-content p {
+        margin: 0;
+        font-size: var(--text-sm);
+        color: var(--neutral-600);
     }
 
     /* Timeline */
-    .timeline {
+    .status-timeline {
         display: flex;
-        flex-direction: column;
-        gap: 16px;
-    }
-
-    .timeline-item {
-        display: flex;
-        gap: 16px;
+        justify-content: space-between;
+        align-items: flex-start;
         position: relative;
+        padding: 0 var(--spacing-4);
     }
 
-    .timeline-item:not(:last-child)::before {
-        content: '';
-        position: absolute;
-        left: 7px;
-        top: 24px;
-        bottom: -16px;
-        width: 2px;
-        background-color: var(--gray-200);
+    @media (max-width: 600px) {
+        .status-timeline {
+            flex-direction: column;
+            gap: var(--spacing-6);
+            padding: 0;
+        }
+        .timeline-line {
+            display: none;
+        }
     }
 
-    .timeline-item.active:not(:last-child)::before {
-        background-color: var(--primary-600);
-    }
-
-    .timeline-dot {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        background-color: var(--gray-200);
-        margin-top: 4px;
-        z-index: 1;
-        flex-shrink: 0;
-    }
-
-    .timeline-item.active .timeline-dot {
-        background-color: var(--primary-600);
-        box-shadow: 0 0 0 4px #f3e8ff;
-    }
-
-    .timeline-content {
+    .timeline-step {
         display: flex;
         flex-direction: column;
-        padding-bottom: 8px;
+        align-items: center;
+        text-align: center;
+        gap: var(--spacing-2);
+        z-index: 2;
+        position: relative;
+        background: var(--color-white);
     }
 
-    .timeline-content strong {
-        font-size: 15px;
-        color: var(--gray-900);
+    @media (max-width: 600px) {
+        .timeline-step {
+            flex-direction: row;
+            text-align: left;
+            width: 100%;
+        }
     }
 
-    .timeline-content span {
-        font-size: 13px;
-        color: var(--gray-500);
+    .step-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: var(--neutral-100);
+        color: var(--neutral-400);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid var(--color-white);
     }
 
-    /* Info Grid */
-    .info-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
+    .timeline-step.completed .step-icon {
+        background-color: var(--primary-100);
+        color: var(--primary-600);
+    }
+
+    .timeline-step.active .step-icon {
+        background-color: var(--primary-600);
+        color: var(--color-white);
+        box-shadow: 0 0 0 4px var(--primary-50);
+    }
+
+    .timeline-step.rejected .step-icon {
+        background-color: #ef4444;
+        color: var(--color-white);
+        box-shadow: 0 0 0 4px #fef2f2;
+    }
+
+    .step-info strong {
+        display: block;
+        font-size: var(--text-sm);
+        color: var(--neutral-900);
+    }
+
+    .step-info span {
+        font-size: 12px;
+        color: var(--neutral-500);
+    }
+
+    .timeline-line {
+        flex: 1;
+        height: 2px;
+        background-color: var(--neutral-200);
+        margin-top: 20px;
+        min-width: 20px;
+    }
+
+    .timeline-line.completed {
+        background-color: var(--primary-500);
+    }
+
+    /* Financial Summary */
+    .financial-summary {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .fin-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: var(--spacing-4) var(--spacing-6);
+        border-bottom: 1px solid var(--neutral-100);
+    }
+    
+    .fin-row:last-child {
+        border-bottom: none;
+    }
+
+    .fin-label {
+        font-size: var(--text-sm);
+        color: var(--neutral-500);
+    }
+
+    .fin-value {
+        font-size: var(--text-base);
+        font-weight: 500;
+        color: var(--neutral-900);
+    }
+
+    .text-danger { color: #ef4444; }
+
+    .highlight-row {
+        background-color: var(--neutral-50);
+    }
+
+    .receive-row {
+        background-color: var(--primary-50);
+    }
+    
+    .receive-value {
+        color: var(--primary-700);
+        font-size: var(--text-lg);
+        font-weight: 700;
+    }
+
+    .fin-divider {
+        height: 1px;
+        background-color: var(--neutral-200);
+        width: 100%;
+    }
+
+    /* Beneficiary Info */
+    .info-group-container {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-5);
     }
 
     .info-group {
         display: flex;
-        flex-direction: column;
-        gap: 4px;
+        align-items: flex-start;
+        gap: var(--spacing-4);
     }
 
-    .full-width {
-        grid-column: 1 / -1;
+    .info-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: var(--radius-full);
+        background-color: var(--neutral-50);
+        color: var(--neutral-500);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
     }
 
-    .mt-2 { margin-top: 8px; }
-
-    .info-group .label {
-        font-size: 12px;
-        color: var(--gray-500);
+    .info-content h5 {
+        margin: 0 0 4px 0;
+        font-size: var(--text-sm);
+        color: var(--neutral-500);
+        font-weight: 500;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.05em;
     }
 
-    .info-group .value {
-        font-size: 15px;
-        color: var(--gray-900);
+    .info-content p {
+        margin: 0;
+        font-size: var(--text-base);
+        font-weight: 500;
+        color: var(--neutral-900);
+    }
+
+    .sub-text {
+        font-size: var(--text-sm);
+        color: var(--neutral-500);
+    }
+
+    .section-divider {
+        border: none;
+        border-top: 1px dashed var(--neutral-200);
+        margin: 0;
+    }
+
+    .w-full { width: 100%; }
+
+    .bank-grid {
+        display: grid;
+        gap: var(--spacing-4);
+        margin-top: var(--spacing-3);
+    }
+
+    .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+    @container section (max-width: 500px) {
+        .bank-grid { grid-template-columns: 1fr; }
+    }
+
+    .bank-field {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .field-label {
+        font-size: 12px;
+        color: var(--neutral-500);
+    }
+
+    .field-value {
+        font-size: var(--text-sm);
+        color: var(--neutral-900);
         font-weight: 500;
     }
 
-    .info-group .highlight {
-        font-weight: 700;
+    /* Docs List */
+    .docs-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-2);
+    }
+
+    .doc-btn {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-3);
+        padding: var(--spacing-3);
+        background-color: var(--neutral-50);
+        border: 1px solid var(--neutral-200);
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: all 0.2s;
+        width: 100%;
+        text-align: left;
+    }
+
+    .doc-btn:hover {
+        background-color: var(--primary-50);
+        border-color: var(--primary-200);
+    }
+    
+    .doc-btn:hover .doc-download {
         color: var(--primary-600);
     }
 
-    /* Receipt */
-    .receipt-card {
-        background-color: var(--gray-50) !important;
+    .doc-icon {
+        color: var(--primary-600);
     }
 
-    .receipt-body {
+    .doc-text {
+        flex: 1;
         display: flex;
         flex-direction: column;
-        gap: 16px;
     }
 
-    .receipt-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 14px;
-        color: var(--gray-600);
+    .doc-text span {
+        font-size: var(--text-sm);
+        font-weight: 500;
+        color: var(--neutral-900);
     }
 
-    .receipt-row strong {
-        color: var(--gray-900);
-        font-size: 15px;
+    .doc-text small {
+        font-size: 12px;
+        color: var(--neutral-500);
     }
 
-    .divider {
-        height: 1px;
-        background-color: var(--gray-200);
-        margin: 4px 0;
+    .doc-download {
+        color: var(--neutral-400);
     }
 
-    .receipt-row.total {
-        font-size: 16px;
-        color: var(--gray-900);
+    .loading-state {
+        text-align: center;
+        padding: 64px 0;
+        color: var(--gray-500);
     }
-
-    .receipt-row.total strong {
-        font-size: 18px;
-    }
-
-    .receipt-row.receive {
-        background-color: #f3e8ff;
-        padding: 16px;
-        border-radius: 8px;
-        color: var(--primary-700);
-        font-weight: 600;
-        margin-top: 8px;
-    }
-
-    .receipt-row.receive strong {
-        color: var(--primary-700);
-        font-size: 20px;
-    }
-
-    .actions {
-        margin-top: 32px;
-    }
-
-    .flex { display: flex; }
-    .justify-center { justify-content: center; }
-    .items-center { align-items: center; }
-    .gap-2 { gap: 8px; }
 </style>

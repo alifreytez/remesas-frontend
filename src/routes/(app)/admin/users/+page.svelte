@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { setHeader } from '$lib/stores/header.svelte';
     import PermissionGuard from '$lib/components/auth/PermissionGuard.svelte';
     import { auth } from '$lib/stores/auth.svelte';
@@ -80,7 +80,7 @@
         { key: 'email', label: 'Correo', filterType: 'text' as const },
         { key: 'document_number', label: 'Cédula', filterType: 'text' as const },
         { key: 'roles', label: 'Roles', filterType: 'text' as const },
-        { key: 'status', label: 'Estado', format: 'badge' as const, badgeMap: { 'Activo': 'success', 'Inactivo': 'danger' }, width: '1%' }
+        { key: 'status', label: 'Estado Registro', format: 'badge' as const, width: '150px', filterType: 'select' as const, filterOptions: [{label: 'Todos', value: ''}, {label: 'ACTIVO', value: 'ACTIVO'}, {label: 'INACTIVO', value: 'INACTIVO'}], badgeMap: { 'ACTIVO': 'success', 'INACTIVO': 'danger' } }
     ];
 
     // Formatear los datos para la tabla
@@ -89,7 +89,7 @@
         username: u.username,
         email: u.email,
         document_number: u._Person?.documentNumber || 'N/A',
-        status: (u.deletedAt || u.deleted_at) ? 'Inactivo' : 'Activo',
+        status: (u.deletedAt || u.deleted_at) ? 'INACTIVO' : 'ACTIVO',
         roles: (u._Roles || []).map((r: any) => r.code).join(', ')
     })));
 </script>
@@ -139,7 +139,7 @@
                             >
                                 {#snippet actions(row)}
                                     <div class="actions-group">
-                                        {#if row.status === 'Activo'}
+                                        {#if row.status === 'ACTIVO'}
                                             <PermissionGuard permission="UI:UPDATE:USERS">
                                                 <button class="action-icon-btn edit" title="Editar" onclick={() => openForm(row.id)}>
                                                     <Edit2 size={16} />
@@ -220,3 +220,4 @@
         color: var(--danger-600);
     }
 </style>
+

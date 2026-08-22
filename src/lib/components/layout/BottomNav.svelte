@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import { page } from '$app/state';
     import { auth } from '$lib/stores/auth.svelte';
     import { USER_TYPES } from '$lib/constants/auth';
@@ -28,7 +28,7 @@
         {#each activeNav as item}
             <a 
                 href={item.path} 
-                class="nav-item {currentPath === item.path ? 'active' : ''}"
+                class="nav-item {currentPath === item.path || currentPath.startsWith(item.path + '/') ? 'active' : ''}"
             >
                 <!-- Renderiza dinámicamente el componente de Lucide -->
                 <svelte:component this={item.icon} size={18} />
@@ -88,3 +88,4 @@
         }
     }
 </style>
+

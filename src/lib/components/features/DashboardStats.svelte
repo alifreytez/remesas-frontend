@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
     import Card from '../ui/Card.svelte';
     
     let {
@@ -89,3 +89,4 @@
         color: var(--text-main);
     }
 </style>
+
